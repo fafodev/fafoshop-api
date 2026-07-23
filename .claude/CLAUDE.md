@@ -11,6 +11,28 @@ còn `UNKNOWN`.
 
 ## Luật Không Được Phá Vỡ
 
+- **[ƯU TIÊN CAO NHẤT] Bảo mật không được thoả hiệp.** TUYỆT ĐỐI KHÔNG viết
+  hoặc để lại code có lỗ hổng bảo mật đã biết — đặc biệt với backend JDBC
+  thuần (không ORM) như dự án này:
+  - **SQL Injection**: LUÔN dùng `PreparedStatement` qua `DBStatement` với
+    placeholder `?` cho MỌI giá trị input (kể cả giá trị tưởng chừng "an
+    toàn" như ID số). TUYỆT ĐỐI KHÔNG nối chuỗi giá trị input trực tiếp vào
+    câu SQL bằng `+`/`String.format`. Nếu bắt buộc phải tham số hoá tên
+    cột/bảng động (không thể dùng `?` cho identifier), PHẢI whitelist cứng
+    (so khớp với danh sách hằng số cho phép trong code), không được ghép
+    thẳng input người dùng vào identifier.
+  - Không lưu/so sánh mật khẩu plaintext — LUÔN qua `PasswordUtility`.
+  - Không bypass `AuthTokenFilter` bằng `@NoAuth` trừ khi thực sự là endpoint
+    công khai.
+  - Không trả lộ thông tin nhạy cảm (stack trace, cấu trúc DB, token nội bộ)
+    trong response lỗi trả về client.
+  - Không hardcode secret/credential DB vào code commit lên repo (đã có cơ
+    chế `db.properties` + `AES128AndBase64` cho việc này).
+
+  Phát hiện lỗ hổng ở code CŨ ngoài phạm vi nhiệm vụ đang làm cũng PHẢI báo
+  ngay cho người dùng, không được im lặng bỏ qua vì "không nằm trong yêu cầu
+  ban đầu". Dự án dự định deploy lên cloud — mọi lỗ hổng để lại đều có rủi ro
+  thật, không phải rủi ro lý thuyết.
 - Toàn bộ nội dung Claude tạo trong repository (comment, Javadoc, tài liệu,
   tên hiển thị, message lỗi trả về client qua `errMsg`/`systemerror.properties`)
   phải dùng tiếng Việt.

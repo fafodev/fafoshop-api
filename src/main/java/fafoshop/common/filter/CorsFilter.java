@@ -20,12 +20,15 @@ import javax.ws.rs.ext.Provider;
  * `@PreMatching` để chặn request OPTIONS (preflight) TRƯỚC khi Jersey định
  * tuyến: nếu không, OPTIONS tới 1 `@Path` chỉ khai GET/POST sẽ bị trả 404
  * trước khi tới được filter; đồng thời request này chạy trước
- * AuthTokenFilter (chạy sau bước định tuyến) — preflight không gửi header
- * Authorization nên sẽ luôn bị AuthTokenFilter trả 401 nếu không chặn sớm.
+ * AuthTokenFilter (chạy sau bước định tuyến) — preflight không gửi cookie
+ * phiên nên sẽ luôn bị AuthTokenFilter trả 401 nếu không chặn sớm.
  *
- * Không dùng Access-Control-Allow-Credentials vì cơ chế xác thực ở đây dùng
- * Bearer token qua header Authorization (IdTokenUtility/AuthTokenFilter),
- * không dùng cookie — không cần bật chế độ credentials của CORS.
+ * CÓ bật Access-Control-Allow-Credentials: true vì xác thực dùng cookie
+ * phiên HttpOnly (SessionCookieUtility/AuthTokenFilter) — trình duyệt CHỈ
+ * gửi/nhận cookie cho request cross-origin khi cả 2 điều kiện: request có
+ * `withCredentials: true` (phía Angular) VÀ response có header này. Khi bật
+ * credentials, Access-Control-Allow-Origin BẮT BUỘC phải là 1 origin cụ thể
+ * (không được `*`) — ALLOWED_ORIGIN bên dưới đã là origin cụ thể sẵn.
  */
 @Provider
 @PreMatching
@@ -54,5 +57,6 @@ public class CorsFilter implements ContainerRequestFilter, ContainerResponseFilt
 		responseContext.getHeaders().putSingle("Access-Control-Allow-Methods",
 				"GET, POST, PUT, DELETE, OPTIONS, HEAD");
 		responseContext.getHeaders().putSingle("Access-Control-Max-Age", "3600");
+		responseContext.getHeaders().putSingle("Access-Control-Allow-Credentials", "true");
 	}
 }

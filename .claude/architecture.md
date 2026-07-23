@@ -47,12 +47,50 @@ chung 1 class).
   `function_code`).
 - `webservice/AbstractWebService` — cầu nối JAX-RS ↔ Process, gán
   `accessInfo.userCode` từ token đã xác thực.
-- `auth/AuthTokenFilter` — `ContainerRequestFilter` kiểm tra Bearer token
-  cho MỌI request (trừ `@NoAuth`), tra bảng `session_token`.
+- `auth/AuthTokenFilter` — `ContainerRequestFilter` kiểm tra token cho MỌI
+  request (trừ `@NoAuth`), đọc từ cookie phiên (xem `SessionCookieUtility`),
+  tra bảng `session_token`.
+- `auth/SessionCookieUtility` — dựng chuỗi header `Set-Cookie` cho cookie
+  phiên (`fafoshop_session`, `HttpOnly`+`Secure`+`SameSite=Strict`) — gom 1
+  chỗ DUY NHẤT cho `AuthTokenFilter` (đọc), `AuthWebService` (set lúc
+  login), `AuthLogoutWebService` (xoá lúc logout).
 - `filter/CorsFilter` — cấu hình CORS cho frontend Angular (origin dev mặc
-  định `http://localhost:4200`).
+  định `http://localhost:4200`), CÓ bật
+  `Access-Control-Allow-Credentials: true` (bắt buộc vì auth dùng cookie).
 - `utility/PasswordUtility` — băm/kiểm mật khẩu (PBKDF2WithHmacSHA256).
-- `utility/IdTokenUtility` — phát hành/kiểm tra token, lưu `session_token`.
+- `utility/IdTokenUtility` — phát hành/kiểm tra/huỷ token (`generate()`/
+  `verify()`/`revoke()`), lưu `session_token`.
+
+## Xác thực (auth) — chi tiết cookie phiên
+
+**Lịch sử quyết định (quan trọng)**: thiết kế ban đầu trả token qua JSON
+body (`AuthLoginResponse.token`), client (Angular) tự lưu `localStorage` rồi
+tự đính `Authorization: Bearer <token>`. Đây là lỗ hổng bảo mật — token lưu
+`localStorage` bị JavaScript độc hại (XSS) đọc trộm được. Trước khi deploy
+lên cloud, đã sửa lại thành cookie `HttpOnly`:
+
+- `POST /pos/auth/login` (`AuthWebService`) — `AuthLoginProcess` vẫn phát
+  hành token như cũ (`IdTokenUtility.generate()`), nhưng `AuthWebService`
+  gắn token vào response qua header `Set-Cookie`
+  (`SessionCookieUtility.buildSessionCookie()`, `Max-Age` = phút cấu hình
+  trong `session.properties` × 60) rồi **gán `response.token = null` TRƯỚC
+  KHI trả JSON** — token KHÔNG BAO GIỜ xuất hiện trong response body thật.
+  Client xác định đăng nhập thành công bằng `fatalError` rỗng.
+- `POST /pos/auth/logout` (`AuthLogoutWebService`, `@NoAuth`, tách WebService
+  riêng theo đúng quy ước 1 action = 1 WebService) — đọc token từ
+  `@CookieParam`, gọi `IdTokenUtility.revoke()` xoá `session_token` tương
+  ứng (best-effort, token không hợp lệ vẫn coi là thành công), LUÔN trả
+  `Set-Cookie` hết hạn ngay (`Max-Age=0`) để trình duyệt xoá cookie — kể cả
+  khi cookie đã hết hạn/không có, vẫn phải trả cookie hết hạn (idempotent).
+- `AuthTokenFilter` đọc token từ `Cookie: fafoshop_session=...` (JAX-RS
+  `requestContext.getCookies()`), KHÔNG còn đọc header `Authorization`.
+- `CorsFilter` bật `Access-Control-Allow-Credentials: true` — bắt buộc để
+  trình duyệt gửi/nhận cookie cross-origin (dev: Angular `4200` gọi API
+  `8080`). Khi bật credentials, `Access-Control-Allow-Origin` PHẢI là origin
+  cụ thể (không được `*`) — `ALLOWED_ORIGIN` đã sẵn là chuỗi cụ thể.
+- Giới hạn đã biết (không phải lỗ hổng, cần nhớ khi deploy): `SameSite=Strict`
+  yêu cầu frontend + backend production cùng site (cùng eTLD+1) — domain
+  thật vẫn `UNKNOWN`. `Secure` yêu cầu HTTPS trừ `localhost`.
 
 ## Quyết Định Thiết Kế
 

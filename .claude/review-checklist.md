@@ -1,5 +1,11 @@
 # Checklist Review
 
+- **Không có lỗ hổng bảo mật đã biết** — ưu tiên kiểm tra mục này TRƯỚC các
+  mục còn lại: mọi câu SQL dùng `?` placeholder qua `DBStatement` (không nối
+  chuỗi input), không lưu/so sánh mật khẩu plaintext, không bypass
+  `AuthTokenFilter` bằng `@NoAuth` khi không thực sự cần, không lộ thông tin
+  nhạy cảm trong response lỗi, không hardcode secret. Xem "Luật Không Được
+  Phá Vỡ" đầu `CLAUDE.md`.
 - Nội dung mới dùng tiếng Việt (comment, message lỗi, Javadoc).
 - Bảng/cột dùng thống nhất `snake_case`, có đủ cột audit
   (`entry_user_code/entry_datetime/entry_program`,

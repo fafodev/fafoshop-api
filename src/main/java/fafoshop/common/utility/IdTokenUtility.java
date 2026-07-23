@@ -25,7 +25,9 @@ public final class IdTokenUtility {
 	private IdTokenUtility() {
 	}
 
-	private static int getSessionMinutes() throws IOException {
+	/** Số phút hết hạn phiên (đọc từ session.properties) — dùng để tính cả
+	 * expire_datetime lưu DB lẫn Max-Age của cookie phiên (AuthWebService). */
+	public static int getSessionMinutes() throws IOException {
 		try (InputStream io = IdTokenUtility.class.getResourceAsStream("/session.properties")) {
 			Properties properties = new Properties();
 			properties.load(io);
@@ -114,6 +116,51 @@ public final class IdTokenUtility {
 		} finally {
 			try {
 				if (rs != null) rs.close();
+				if (ps != null) ps.close();
+				if (dba != null) dba.disconnect();
+			} catch (Exception ignore) {
+			}
+		}
+	}
+
+	/**
+	 * Huỷ token (đăng xuất) — xoá khỏi session_token, dùng cho luồng logout để
+	 * cookie/token cũ không còn dùng lại được nữa dù chưa hết hạn tự nhiên.
+	 * Token không hợp lệ/không giải mã được thì coi như đã đăng xuất, không
+	 * báo lỗi (logout phải luôn thành công theo góc nhìn client).
+	 */
+	synchronized public static void revoke(String encryptedToken) throws FatalException, DBException {
+
+		if (encryptedToken == null || encryptedToken.isEmpty()) {
+			return;
+		}
+
+		DBAccessor dba = null;
+		DBStatement ps = null;
+
+		try {
+			String rawToken;
+			try {
+				rawToken = AES128AndBase64.decrypt(encryptedToken);
+			} catch (Exception e) {
+				return;
+			}
+
+			dba = new DBAccessor();
+			ps = dba.prepareStatement("DELETE FROM session_token WHERE token = ?");
+			ps.setString(1, rawToken);
+			ps.executeUpdate();
+			ps.close();
+			dba.commit();
+
+		} catch (DBException e) {
+			try {
+				if (dba != null) dba.rollback();
+			} catch (DBException ignore) {
+			}
+			throw e;
+		} finally {
+			try {
 				if (ps != null) ps.close();
 				if (dba != null) dba.disconnect();
 			} catch (Exception ignore) {

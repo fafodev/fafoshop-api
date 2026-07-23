@@ -8,7 +8,7 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.Context;
-import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
@@ -24,6 +24,13 @@ import fafoshop.common.utility.MessageUtility;
  * Đặt ở tầng JAX-RS ContainerRequestFilter (áp dụng tự động cho MỌI
  * endpoint) thay vì gọi tay trong từng Process — tránh trường hợp process
  * mới quên gọi kiểm tra token.
+ *
+ * Token đọc từ cookie {@link SessionCookieUtility#SESSION_COOKIE_NAME}
+ * (HttpOnly, do trình duyệt tự gửi kèm request), KHÔNG còn đọc từ header
+ * Authorization/Bearer như trước — tránh việc client (Angular) phải tự cầm
+ * giá trị token bằng JavaScript rồi lưu localStorage (lỗ hổng: JS độc hại từ
+ * XSS đọc được token). Xem SessionCookieUtility để biết chi tiết thuộc tính
+ * cookie.
  */
 @Provider
 @Priority(Priorities.AUTHENTICATION)
@@ -42,13 +49,13 @@ public class AuthTokenFilter implements ContainerRequestFilter {
 			return;
 		}
 
-		String authHeader = requestContext.getHeaderString(HttpHeaders.AUTHORIZATION);
-		if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+		Cookie sessionCookie = requestContext.getCookies().get(SessionCookieUtility.SESSION_COOKIE_NAME);
+		if (sessionCookie == null || sessionCookie.getValue() == null || sessionCookie.getValue().isEmpty()) {
 			abortUnauthorized(requestContext, "MC000002");
 			return;
 		}
 
-		String token = authHeader.substring("Bearer ".length());
+		String token = sessionCookie.getValue();
 		String userCode;
 		try {
 			userCode = IdTokenUtility.verify(token);
