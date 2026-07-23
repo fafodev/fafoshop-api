@@ -85,3 +85,35 @@ còn `UNKNOWN`.
   chắc độ dài.
 - Ưu tiên `mvn -o compile` để verify (kiểm chứng) nhanh khi không cần tải
   dependency mới; bỏ `-o` khi cần dependency mới từ Maven Central.
+
+## Lỗi Encoding (Mojibake) — Kinh Nghiệm Thực Tế, Claude THƯỜNG MẮC
+
+Sự cố thật: comment cột DB tiếng Việt (`product.reduced_tax_rate_flg`,
+`promotion.discount_type`, `sale_order.void_flg`...) bị lưu sai thành
+mojibake (`quy t?c c? th?...`) dù `db/schema.sql` nguồn vẫn đúng UTF-8 — do
+lúc chạy DDL trước đây, charset kết nối MySQL client không phải UTF-8.
+
+Khi viết/chạy 1 chương trình Java tạm (`javac`/`java`) trên máy dev này
+(Windows + Git Bash + JDK 21) để thao tác dữ liệu tiếng Việt (đọc/ghi DB qua
+JDBC, in ra để review...), PHẢI làm ĐỦ 3 việc, thiếu 1 là dữ liệu/hiển thị
+sai:
+
+1. **Biên dịch**: `javac -encoding UTF-8 ...` — dù JDK 18+ mặc định đọc
+   source UTF-8, vẫn khai rõ để chắc chắn không phụ thuộc codepage hệ thống.
+2. **Kết nối JDBC**: URL đã có sẵn `useUnicode=true&characterEncoding=UTF-8`
+   trong `db.properties`/`DBAccessor` — giữ nguyên, không được bỏ khi tự viết
+   script JDBC tạm ngoài `DBAccessor`.
+3. **In ra console để review**: `java -Dstdout.encoding=UTF-8
+   -Dstderr.encoding=UTF-8 ...` — trên Windows, `System.out` mặc định theo
+   codepage console (không phải UTF-8) dù `-Dfile.encoding=UTF-8` đã bật,
+   nên chữ có dấu in ra Git Bash sẽ thành `?`/ký tự vỡ dù dữ liệu Java/DB bên
+   dưới HOÀN TOÀN đúng. Đây là lỗi hiển thị stream, KHÔNG được kết luận dữ
+   liệu sai chỉ vì nhìn thấy `?` trên terminal — phải xác minh lại bằng cách
+   ghi output ra file rồi đọc file đó bằng tool đọc UTF-8 đúng (vd `Read`)
+   trước khi kết luận.
+
+Ngược lại, cũng KHÔNG được mặc định coi mọi ký tự `?`/lỗi hiển thị là "chỉ
+do terminal" rồi bỏ qua — như sự cố mojibake ở DB thật đã chứng minh, đôi
+khi dữ liệu lưu thật sự sai. Luôn xác minh lại tận nguồn (query DB thật qua
+kênh đảm bảo UTF-8, hoặc đọc lại file nguồn) thay vì tin vào 1 lần in ra
+console.

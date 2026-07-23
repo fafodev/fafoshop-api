@@ -25,6 +25,32 @@ phải tiếng Việt.
 plaintext, cột `entry_program`/`update_program` không vượt quá độ dài cột,
 không phát minh nghiệp vụ đang `UNKNOWN`.
 
+## Phiên Bản Java — BẮT BUỘC JDK 8
+
+Project pin `maven.compiler.source`/`target = 1.8` trong `pom.xml` — LUÔN
+biên dịch/chạy bằng JDK 8, không dùng JDK mới hơn (17, 21...) dù máy dev có
+cài song song nhiều bản.
+
+**Lưu ý PATH trên máy dev này**: `JAVA_HOME` đã trỏ đúng
+`C:\Program Files\Java\jdk1.8.0_202`, nhưng gọi trần `java`/`javac` trong
+Git Bash có thể resolve nhầm sang JDK khác (`Common Files\Oracle\Java\javapath`
+đứng trước trong PATH, từng trỏ tới JDK 21) — LUÔN kiểm tra `java -version`
+trước khi build/compile tay ngoài `mvn` (vd viết 1 tool Java tạm để thao tác
+DB), đừng mặc định tin PATH mặc định là JDK 8.
+
+Nếu lệnh `java`/`javac` trần bị lệch phiên bản, set JAVA_HOME/PATH tạm CHỈ
+cho lệnh đó (không sửa PATH hệ thống) — trong Git Bash:
+
+```
+JAVA_HOME="/c/Program Files/Java/jdk1.8.0_202" \
+PATH="/c/Program Files/Java/jdk1.8.0_202/bin:$PATH" \
+javac -encoding UTF-8 ...
+```
+
+`mvn -o compile`/`mvn -o package` thường tự đọc đúng `JAVA_HOME` nên ít gặp
+vấn đề này hơn — rủi ro lệch bản chủ yếu khi tự gọi `javac`/`java` trực tiếp
+(tool tạm, không qua Maven).
+
 ## Verify
 
 - `mvn -o compile` để build nhanh (offline, dùng cache Maven local).
