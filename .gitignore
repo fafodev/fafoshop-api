@@ -1,0 +1,7 @@
+/target/
+/bin/
+/console/
+
+# Mat khau admin MySQL dung chung cho ca server (khong rieng project nay) —
+# KHONG commit, chi dung tam de bootstrap database/user luc dev.
+/db/mysql8.info

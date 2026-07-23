@@ -1,0 +1,150 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>fafoshop</groupId>
+	<artifactId>fafoshop-api</artifactId>
+	<packaging>war</packaging>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>fafoshop-api</name>
+
+	<!--
+		pom.xml này CHỦ Ý tối giản — chỉ giữ dependency thật sự cần cho 1 API
+		bán lẻ (POS): Jersey (JAX-RS) + Jackson (JSON) + MySQL + log4j. Không
+		thêm JasperReports/barcode4j/POI/PDFBox/Azure/SendGrid/zip4j/msal4j hay
+		dependency nào khác khi chưa có nhu cầu thật.
+	-->
+
+	<build>
+		<finalName>fafoshop-api</finalName>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-war-plugin</artifactId>
+				<version>3.3.1</version>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.8.1</version>
+			</plugin>
+		</plugins>
+	</build>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.glassfish.jersey</groupId>
+				<artifactId>jersey-bom</artifactId>
+				<version>2.36</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.glassfish.jersey.containers</groupId>
+			<artifactId>jersey-container-servlet</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.glassfish.jersey.media</groupId>
+			<artifactId>jersey-media-json-jackson</artifactId>
+		</dependency>
+		<!-- Spring Boot CHỈ dùng để dựng nhanh Tomcat nhúng (embedded) chạy Jersey
+			 lúc dev (xem FafoshopApplication.main()) — thay cho việc cấu hình
+			 "Run on Server" trong Eclipse. KHÔNG dùng Spring DI/bean cho nghiệp
+			 vụ, mọi Process/WebService vẫn JDBC thuần như quy ước dự án.
+			 spring-boot-starter-logging bị loại (exclusion) vì nó kéo theo
+			 Logback, mà Logback sẽ giành quyền định tuyến log của
+			 SLF4J/commons-logging thay vì log4j.xml — im lặng làm mất log ra file
+			 rolling hàng ngày. slf4j-log4j12 (dependency có sẵn bên dưới) route
+			 ngược log của Spring về log4j 1.2 như cũ. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jersey</artifactId>
+			<version>2.5.0</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-logging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+			<version>2.5.0</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-logging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+			<version>5.3.15</version> <!-- Bản tương thích Java 8 -->
+		</dependency>
+		<dependency>
+			<groupId>mysql</groupId>
+			<artifactId>mysql-connector-java</artifactId>
+			<version>8.0.30</version>
+		</dependency>
+		<!-- log4j.xml + file rolling hàng ngày, không dùng logback để tránh
+			 silently mất log file (xem ghi chú exclusion phía trên). -->
+		<dependency>
+			<groupId>log4j</groupId>
+			<artifactId>log4j</artifactId>
+			<version>1.2.17</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-log4j12</artifactId>
+			<version>1.7.30</version>
+		</dependency>
+		<dependency>
+			<groupId>commons-logging</groupId>
+			<artifactId>commons-logging</artifactId>
+			<version>1.2</version>
+		</dependency>
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>servlet-api</artifactId>
+			<version>2.5</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- Chỉ dùng để chạy thử API qua HTTP thật lúc dev (DevServerMain trong
+			 src/test/java) — scope "test" nên KHÔNG đóng gói vào WAR, không ảnh
+			 hưởng bản build thật deploy lên Tomcat. -->
+		<dependency>
+			<groupId>org.glassfish.jersey.containers</groupId>
+			<artifactId>jersey-container-grizzly2-http</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- BẮT BUỘC phải ở scope mặc định (compile), KHÔNG phải "test" — đây là
+			 module cung cấp Hk2InjectionManagerFactory, thứ Jersey dùng
+			 ServiceLoader để tự bootstrap ApplicationHandler lúc khởi động
+			 servlet. Thiếu nó (kể cả khi deploy .war thật lên Tomcat, không chỉ
+			 lúc chạy FafoshopApplication) sẽ ném "IllegalStateException:
+			 InjectionManagerFactory not found" ngay khi servlet init — đã xác
+			 minh bằng jar tf target/fafoshop-api.war thiếu đúng file này khi còn
+			 để scope "test". -->
+		<dependency>
+			<groupId>org.glassfish.jersey.inject</groupId>
+			<artifactId>jersey-hk2</artifactId>
+		</dependency>
+	</dependencies>
+
+	<properties>
+		<jersey.version>2.36</jersey.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven.compiler.target>1.8</maven.compiler.target>
+		<maven.compiler.source>1.8</maven.compiler.source>
+	</properties>
+
+</project>
