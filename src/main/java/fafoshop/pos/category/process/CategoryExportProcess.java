@@ -1,4 +1,4 @@
-package fafoshop.pos.product.process;
+package fafoshop.pos.category.process;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -29,46 +29,45 @@ import fafoshop.common.exception.ProcessCheckErrorException;
 import fafoshop.common.process.AbstractProcess;
 import fafoshop.common.utility.CommonUtility;
 import fafoshop.common.utility.MessageUtility;
-import fafoshop.pos.product.dto.ProductExportRequest;
-import fafoshop.pos.product.dto.ProductExportResponse;
-import fafoshop.pos.product.dto.ProductRowDto;
+import fafoshop.pos.category.dto.CategoryExportRequest;
+import fafoshop.pos.category.dto.CategoryExportResponse;
+import fafoshop.pos.category.dto.CategoryFullRowDto;
 
 /**
- * Xuất danh sách sản phẩm ra Excel (.xlsx, Apache POI) hoặc CSV — dùng lại
- * đúng bộ lọc của ProductSearchProcess (qua ProductQueryHelper) nhưng KHÔNG
- * phân trang, lấy toàn bộ kết quả khớp filter.
+ * Xuất danh sách danh mục ra Excel (.xlsx, Apache POI) hoặc CSV — dùng lại
+ * đúng bộ lọc của CategorySearchProcess (qua CategoryQueryHelper) nhưng
+ * KHÔNG phân trang, lấy toàn bộ kết quả khớp filter. Cùng khuôn
+ * ProductExportProcess.
  */
-public class ProductExportProcess extends AbstractProcess {
+public class CategoryExportProcess extends AbstractProcess {
 
 	/** Ký tự Excel/LibreOffice tự diễn giải thành công thức nếu đứng đầu ô. */
 	private static final String FORMULA_TRIGGER_CHARS = "=+-@";
 
 	private static final String[] HEADERS = {
-			"Mã sản phẩm", "Tên sản phẩm", "Tên rút gọn", "Mã vạch", "Mã danh mục", "Tên danh mục",
-			"Nhà cung cấp", "Đơn vị tính", "Thuế ưu đãi", "Giá bán", "Định mức tồn tối thiểu",
-			"Trạng thái", "Cập nhật gần nhất"
+			"Mã danh mục", "Tên danh mục", "Loại danh mục", "Thứ tự hiển thị", "Trạng thái", "Cập nhật gần nhất"
 	};
 
-	public ProductExportProcess(ILogSender logSender) {
+	public CategoryExportProcess(ILogSender logSender) {
 		super(logSender);
 	}
 
 	@Override
 	protected AbstractResponse createNewResponse(AbstractRequest request) {
-		return new ProductExportResponse();
+		return new CategoryExportResponse();
 	}
 
 	@Override
 	protected String getFuncId() {
-		return "PRDCT_VIEW";
+		return "CTGR_VIEW";
 	}
 
 	@Override
 	public AbstractResponse process(DBAccessor dba, AbstractRequest request, AbstractResponse response,
 			AbstractResponse parentResponse) throws FatalException, DBException, ProcessCheckErrorException {
 
-		ProductExportRequest req = (ProductExportRequest) request;
-		ProductExportResponse res = (ProductExportResponse) response;
+		CategoryExportRequest req = (CategoryExportRequest) request;
+		CategoryExportResponse res = (CategoryExportResponse) response;
 
 		if (!"XLSX".equals(req.format) && !"CSV".equals(req.format)) {
 			List<ErrorDto> errors = new ArrayList<>();
@@ -79,36 +78,36 @@ public class ProductExportProcess extends AbstractProcess {
 			throw new ProcessCheckErrorException(errors, ConstantValue.NORMAL_ERROR);
 		}
 
-		List<ProductRowDto> rows = queryAllRows(dba, req);
+		List<CategoryFullRowDto> rows = queryAllRows(dba, req);
 
 		String timestamp = CommonUtility.compactTimestamp();
 		if ("CSV".equals(req.format)) {
 			res.fileBytes = buildCsv(rows);
-			res.fileName = "san_pham_" + timestamp + ".csv";
+			res.fileName = "danh_muc_" + timestamp + ".csv";
 			res.contentType = "text/csv; charset=UTF-8";
 		} else {
 			res.fileBytes = buildXlsx(rows);
-			res.fileName = "san_pham_" + timestamp + ".xlsx";
+			res.fileName = "danh_muc_" + timestamp + ".xlsx";
 			res.contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 		}
 
 		return res;
 	}
 
-	private List<ProductRowDto> queryAllRows(DBAccessor dba, ProductExportRequest req) throws DBException {
+	private List<CategoryFullRowDto> queryAllRows(DBAccessor dba, CategoryExportRequest req) throws DBException {
 		StringBuilder where = new StringBuilder();
 		List<String> params = new ArrayList<>();
-		ProductQueryHelper.buildWhereClause(req.keyword, req.categoryCode, req.statusFilter, where, params);
+		CategoryQueryHelper.buildWhereClause(req.keyword, req.categoryType, req.statusFilter, where, params);
 
-		String sortColumn = ProductQueryHelper.resolveSortColumn(req.sortField);
-		String sortDirection = ProductQueryHelper.resolveSortDirection(req.sortDirection);
+		String sortColumn = CategoryQueryHelper.resolveSortColumn(req.sortField);
+		String sortDirection = CategoryQueryHelper.resolveSortDirection(req.sortDirection);
 
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
 			StringBuilder sql = new StringBuilder();
-			sql.append("SELECT ").append(ProductQueryHelper.SELECT_COLUMNS_SQL);
-			sql.append(ProductQueryHelper.FROM_JOIN_SQL);
+			sql.append("SELECT ").append(CategoryQueryHelper.SELECT_COLUMNS_SQL);
+			sql.append(CategoryQueryHelper.FROM_JOIN_SQL);
 			sql.append(where);
 			sql.append("ORDER BY ").append(sortColumn).append(" ").append(sortDirection);
 
@@ -120,9 +119,9 @@ public class ProductExportProcess extends AbstractProcess {
 
 			rs = ps.executeQuery();
 
-			List<ProductRowDto> rows = new ArrayList<>();
+			List<CategoryFullRowDto> rows = new ArrayList<>();
 			while (rs.next()) {
-				rows.add(ProductQueryHelper.mapRow(rs));
+				rows.add(CategoryQueryHelper.mapRow(rs));
 			}
 			return rows;
 
@@ -143,18 +142,15 @@ public class ProductExportProcess extends AbstractProcess {
 	 * trình duyệt) sẽ đoán sai encoding và hiển thị tiếng Việt có dấu bị lỗi
 	 * dù nội dung file thực chất đã đúng UTF-8.
 	 */
-	private byte[] buildCsv(List<ProductRowDto> rows) {
+	private byte[] buildCsv(List<CategoryFullRowDto> rows) {
 		StringBuilder sb = new StringBuilder();
 		sb.append('﻿');
 		sb.append(String.join(",", escapeCsvRow(HEADERS))).append("\r\n");
 
-		for (ProductRowDto row : rows) {
+		for (CategoryFullRowDto row : rows) {
 			String[] values = {
-					row.productCode, row.name, row.shortName, row.barcode, row.categoryCode, row.categoryName,
-					row.supplierNames, row.unitName,
-					"1".equals(row.reducedTaxRateFlg) ? "Có" : "Không",
-					row.price != null ? row.price.toPlainString() : "",
-					row.minStockQty != null ? row.minStockQty.toString() : "0",
+					row.categoryCode, row.name, row.categoryType,
+					row.displayOrder != null ? row.displayOrder.toString() : "0",
 					"1".equals(row.delFlg) ? "Đã xoá" : "Còn hiệu lực",
 					row.updateDatetime
 			};
@@ -185,14 +181,9 @@ public class ProductExportProcess extends AbstractProcess {
 	}
 
 	/**
-	 * Chống CSV Injection (Formula Injection, CWE-1236): nếu ô bắt đầu bằng
-	 * ký tự Excel/LibreOffice diễn giải thành công thức ('=', '+', '-', '@'),
-	 * thêm tiền tố dấu nháy đơn để buộc ô đó được đọc như văn bản thuần thay
-	 * vì công thức — theo khuyến nghị OWASP CSV Injection Cheat Sheet. Dữ
-	 * liệu tên sản phẩm/tên rút gọn... do người dùng có quyền PRDCT_EDIT nhập
-	 * tự do, không thể coi là input tin cậy khi ghi thẳng vào file xuất ra
-	 * ngoài hệ thống (phát hiện qua test thủ công: tên "=CMD(calc)" bị ghi
-	 * nguyên văn vào CSV).
+	 * Chống CSV Injection (Formula Injection, CWE-1236) — cùng cơ chế đã áp
+	 * dụng cho Product/Supplier export, xem giải thích đầy đủ ở
+	 * ProductExportProcess.
 	 */
 	private String neutralizeFormulaTrigger(String value) {
 		if (!value.isEmpty() && FORMULA_TRIGGER_CHARS.indexOf(value.charAt(0)) >= 0) {
@@ -206,9 +197,9 @@ public class ProductExportProcess extends AbstractProcess {
 	 * trên môi trường server headless. Dùng độ rộng cột cố định hợp lý thay
 	 * thế (đơn vị POI: 1/256 ký tự).
 	 */
-	private byte[] buildXlsx(List<ProductRowDto> rows) throws FatalException {
+	private byte[] buildXlsx(List<CategoryFullRowDto> rows) throws FatalException {
 		try (Workbook wb = new XSSFWorkbook()) {
-			Sheet sheet = wb.createSheet("Sản phẩm");
+			Sheet sheet = wb.createSheet("Danh mục");
 
 			Font headerFont = wb.createFont();
 			headerFont.setBold(true);
@@ -224,21 +215,14 @@ public class ProductExportProcess extends AbstractProcess {
 			}
 
 			int rowIndex = 1;
-			for (ProductRowDto row : rows) {
+			for (CategoryFullRowDto row : rows) {
 				Row dataRow = sheet.createRow(rowIndex++);
-				setCell(dataRow, 0, row.productCode);
+				setCell(dataRow, 0, row.categoryCode);
 				setCell(dataRow, 1, row.name);
-				setCell(dataRow, 2, row.shortName);
-				setCell(dataRow, 3, row.barcode);
-				setCell(dataRow, 4, row.categoryCode);
-				setCell(dataRow, 5, row.categoryName);
-				setCell(dataRow, 6, row.supplierNames);
-				setCell(dataRow, 7, row.unitName);
-				setCell(dataRow, 8, "1".equals(row.reducedTaxRateFlg) ? "Có" : "Không");
-				dataRow.createCell(9).setCellValue(row.price != null ? row.price.doubleValue() : 0d);
-				dataRow.createCell(10).setCellValue(row.minStockQty != null ? row.minStockQty : 0);
-				setCell(dataRow, 11, "1".equals(row.delFlg) ? "Đã xoá" : "Còn hiệu lực");
-				setCell(dataRow, 12, row.updateDatetime);
+				setCell(dataRow, 2, row.categoryType);
+				dataRow.createCell(3).setCellValue(row.displayOrder != null ? row.displayOrder : 0);
+				setCell(dataRow, 4, "1".equals(row.delFlg) ? "Đã xoá" : "Còn hiệu lực");
+				setCell(dataRow, 5, row.updateDatetime);
 			}
 
 			ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -251,11 +235,8 @@ public class ProductExportProcess extends AbstractProcess {
 	}
 
 	/**
-	 * Cùng phòng thủ CSV Injection ở trên áp dụng cho XLSX theo chiều sâu:
-	 * POI ghi cell dạng chuỗi tường minh (kiểu STRING trong OOXML) nên rủi ro
-	 * thấp hơn CSV thuần văn bản, nhưng vẫn trung hoà để nhất quán 2 định
-	 * dạng xuất, phòng trường hợp phần mềm bảng tính nào đó vẫn tự suy đoán
-	 * công thức từ nội dung ô.
+	 * Cùng phòng thủ CSV Injection ở trên áp dụng cho XLSX theo chiều sâu —
+	 * xem giải thích đầy đủ ở ProductExportProcess.setCell().
 	 */
 	private void setCell(Row row, int index, String value) {
 		row.createCell(index).setCellValue(value != null ? neutralizeFormulaTrigger(value) : "");

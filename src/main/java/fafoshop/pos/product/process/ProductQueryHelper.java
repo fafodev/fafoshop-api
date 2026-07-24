@@ -20,13 +20,21 @@ final class ProductQueryHelper {
 	private ProductQueryHelper() {
 	}
 
+	/**
+	 * supplier_names lấy qua SUBQUERY vô hướng (không phải JOIN thường) —
+	 * sản phẩm có thể có NHIỀU NCC (bảng product_supplier), JOIN thường sẽ
+	 * nhân dòng và làm sai COUNT(*)/phân trang của ProductSearchProcess.
+	 * Subquery giữ nguyên 1 dòng/sản phẩm.
+	 */
 	static final String SELECT_COLUMNS_SQL = "p.product_code, p.name, p.short_name, p.barcode, p.category_code, "
-			+ "c.name AS category_name, p.supplier_code, s.name AS supplier_name, p.unit_name, "
-			+ "p.reduced_tax_rate_flg, p.price, p.min_stock_qty, p.del_flg, p.update_datetime ";
+			+ "c.name AS category_name, "
+			+ "(SELECT GROUP_CONCAT(s2.name ORDER BY s2.name SEPARATOR ', ') FROM product_supplier ps2 "
+			+ " JOIN supplier s2 ON s2.supplier_code = ps2.supplier_code "
+			+ " WHERE ps2.product_code = p.product_code) AS supplier_names, "
+			+ "p.unit_name, p.reduced_tax_rate_flg, p.price, p.min_stock_qty, p.del_flg, p.update_datetime ";
 
 	static final String FROM_JOIN_SQL = "FROM product p "
-			+ "LEFT JOIN category c ON c.category_code = p.category_code "
-			+ "LEFT JOIN supplier s ON s.supplier_code = p.supplier_code ";
+			+ "LEFT JOIN category c ON c.category_code = p.category_code ";
 
 	private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -82,8 +90,7 @@ final class ProductQueryHelper {
 		row.barcode = rs.getString("barcode");
 		row.categoryCode = rs.getString("category_code");
 		row.categoryName = rs.getString("category_name");
-		row.supplierCode = rs.getString("supplier_code");
-		row.supplierName = rs.getString("supplier_name");
+		row.supplierNames = rs.getString("supplier_names");
 		row.unitName = rs.getString("unit_name");
 		row.reducedTaxRateFlg = rs.getString("reduced_tax_rate_flg");
 		row.price = rs.getBigDecimal("price");

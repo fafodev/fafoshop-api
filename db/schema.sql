@@ -15,6 +15,27 @@ CREATE DATABASE IF NOT EXISTS fafoshop_pos
 USE fafoshop_pos;
 
 -- ----------------------------------------------------------------------------
+-- seq_no — sinh mã quản lý tự động CHUẨN CHUNG toàn hệ thống (xem
+-- .claude/seqno-convention.md) cho MỌI mã tự sinh (category_code,
+-- supplier_code, product_code...). Tạo TRƯỚC category/supplier/product vì
+-- các Process tạo mới của những bảng đó đều gọi SeqNoUtility (đọc bảng này)
+-- ngay trong transaction INSERT.
+-- ----------------------------------------------------------------------------
+CREATE TABLE seq_no (
+  prefix           VARCHAR(4)    NOT NULL COMMENT 'Tiền tố nhận diện loại mã (khoá chính) - vd NCC, DM, SP',
+  seq_no           BIGINT        NOT NULL DEFAULT 0 COMMENT 'Số thứ tự đã cấp gần nhất cho prefix này - tăng dần liên tục, KHÔNG reset theo ngày',
+  max_digit        INT           NOT NULL DEFAULT 4 COMMENT 'Số chữ số đệm 0 bên trái khi ghép mã (vd 4 -> 0001); số vượt quá vẫn in đủ chữ số, không cắt bớt',
+  description      VARCHAR(100)  NULL COMMENT 'Mô tả mục đích dùng của prefix này',
+  entry_user_code  VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
+  entry_datetime   TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
+  entry_program    VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình tạo bản ghi',
+  update_user_code VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng cập nhật gần nhất',
+  update_datetime  TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm cập nhật gần nhất (mỗi lần cấp số mới cũng tính 1 lần update)',
+  update_program   VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
+  PRIMARY KEY (prefix)
+);
+
+-- ----------------------------------------------------------------------------
 -- category — bảng mã DÙNG CHUNG nhiều nghiệp vụ (không riêng cho product).
 -- category_code là khoá chính DUY NHẤT (1 cột); category_type phân biệt
 -- bảng này đang phục vụ nghiệp vụ nào (PRODUCT = danh mục sản phẩm) để sau
@@ -22,7 +43,7 @@ USE fafoshop_pos;
 -- tạo trước product vì product.category_code tham chiếu khoá ngoại tới đây.
 -- ----------------------------------------------------------------------------
 CREATE TABLE category (
-  category_code    VARCHAR(4)    NOT NULL COMMENT 'Mã danh mục (khoá chính, bảng mã dùng chung nhiều nghiệp vụ)',
+  category_code    VARCHAR(20)   NOT NULL COMMENT 'Mã danh mục (khoá chính, bảng mã dùng chung nhiều nghiệp vụ) - tự sinh dạng DM+yyyyMMdd+4 số (xem seq_no/SeqNoUtility)',
   category_type    VARCHAR(20)   NOT NULL COMMENT 'Loại danh mục - phân biệt bảng này đang phục vụ nghiệp vụ nào (vd PRODUCT = danh mục sản phẩm)',
   name             VARCHAR(100)  NOT NULL COMMENT 'Tên danh mục',
   display_order    INT(9)        NOT NULL DEFAULT 0 COMMENT 'Thứ tự hiển thị',
@@ -45,8 +66,7 @@ CREATE TABLE product (
   name                  VARCHAR(100)   NOT NULL COMMENT 'Tên sản phẩm',
   short_name            VARCHAR(50)    NULL COMMENT 'Tên rút gọn sản phẩm',
   barcode               VARCHAR(14)    NULL COMMENT 'Mã vạch sản phẩm',
-  category_code         VARCHAR(4)     NULL COMMENT 'Mã danh mục sản phẩm',
-  supplier_code         VARCHAR(20)    NULL COMMENT 'Mã nhà cung cấp',
+  category_code         VARCHAR(20)    NULL COMMENT 'Mã danh mục sản phẩm',
   unit_name             VARCHAR(20)    NULL DEFAULT '0' COMMENT 'Đơn vị tính (cái, kg, thùng...)',
   reduced_tax_rate_flg  VARCHAR(1)     NULL DEFAULT '0' COMMENT 'Cờ áp dụng thuế suất ưu đãi: 1=có, 0=không; quy tắc cụ thể: UNKNOWN',
   price                 DECIMAL(12,2)  NOT NULL DEFAULT 0 COMMENT 'Giá bán cố định của sản phẩm',
@@ -60,7 +80,6 @@ CREATE TABLE product (
   update_program        VARCHAR(10)    NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
   PRIMARY KEY (product_code),
   KEY idx_product_barcode (barcode),
-  KEY idx_product_supplier_code (supplier_code),
   CONSTRAINT fk_product_category FOREIGN KEY (category_code) REFERENCES category (category_code)
 );
 
@@ -88,6 +107,30 @@ CREATE TABLE supplier (
   update_datetime  TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm cập nhật gần nhất',
   update_program   VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
   PRIMARY KEY (supplier_code)
+);
+
+-- ----------------------------------------------------------------------------
+-- product_supplier — quan hệ NHIỀU-NHIỀU sản phẩm <-> nhà cung cấp (1 sản
+-- phẩm có thể lấy từ nhiều NCC khác nhau, mỗi NCC có mã hàng riêng + giá
+-- mua riêng). KHÔNG có khái niệm "NCC chính" — danh sách ngang hàng. Theo
+-- đúng tiền lệ bảng quan hệ nhiều-nhiều đã có (function_permission): khoá
+-- chính GHÉP, đủ audit column, KHÔNG có del_flg (xoá quan hệ = xoá thẳng
+-- dòng, không xoá mềm).
+-- ----------------------------------------------------------------------------
+CREATE TABLE product_supplier (
+  product_code           VARCHAR(100)  NOT NULL COMMENT 'Mã sản phẩm (1 phần khoá chính)',
+  supplier_code          VARCHAR(20)   NOT NULL COMMENT 'Mã nhà cung cấp (1 phần khoá chính)',
+  supplier_product_code  VARCHAR(50)   NULL COMMENT 'Mã hàng riêng của NCC cho sản phẩm này (khác product_code nội bộ)',
+  purchase_price         DECIMAL(12,2) NULL COMMENT 'Giá mua từ NCC này - quy tắc thuế/làm tròn khi mua: UNKNOWN',
+  entry_user_code        VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
+  entry_datetime         TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
+  entry_program          VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình tạo bản ghi',
+  update_user_code       VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng cập nhật gần nhất',
+  update_datetime        TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm cập nhật gần nhất',
+  update_program         VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
+  PRIMARY KEY (product_code, supplier_code),
+  CONSTRAINT fk_prodsup_product FOREIGN KEY (product_code) REFERENCES product (product_code),
+  CONSTRAINT fk_prodsup_supplier FOREIGN KEY (supplier_code) REFERENCES supplier (supplier_code)
 );
 
 -- ----------------------------------------------------------------------------

@@ -12,8 +12,8 @@ public class ProductRowDto extends AbstractDto {
 	public String barcode;
 	public String categoryCode;
 	public String categoryName;
-	public String supplierCode;
-	public String supplierName;
+	/** Tên các NCC đang gắn với sản phẩm này, nối chuỗi bằng ", " — sản phẩm có thể có NHIỀU NCC (xem bảng product_supplier). */
+	public String supplierNames;
 	public String unitName;
 	public String reducedTaxRateFlg;
 	public BigDecimal price;

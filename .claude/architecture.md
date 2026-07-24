@@ -60,6 +60,11 @@ chung 1 class).
 - `utility/PasswordUtility` — băm/kiểm mật khẩu (PBKDF2WithHmacSHA256).
 - `utility/IdTokenUtility` — phát hành/kiểm tra/huỷ token (`generate()`/
   `verify()`/`revoke()`), lưu `session_token`.
+- `utility/SeqNoUtility` — sinh mã quản lý tự động CHUẨN CHUNG toàn hệ
+  thống (category_code/supplier_code/product_code...), đọc/tăng bảng
+  `seq_no` trong CÙNG transaction của Process gọi tới. Xem đầy đủ quy ước
+  (định dạng mã, danh sách prefix đã đăng ký, cách thêm prefix mới) tại
+  `.claude/seqno-convention.md`.
 
 ## Xác thực (auth) — chi tiết cookie phiên
 

@@ -50,12 +50,13 @@ public class ProductUpdateProcess extends AbstractProcess {
 
 		ProductFieldValidator.validate(dba, req.name, req.price, req.barcode, req.productCode);
 		ProductCategoryValidator.validate(dba, req.categoryCode);
+		ProductSupplierValidator.validate(dba, req.suppliers);
 
 		DBStatement ps = null;
 		try {
 			StringBuilder sql = new StringBuilder();
 			sql.append("UPDATE product SET ");
-			sql.append("name = ?, short_name = ?, barcode = ?, category_code = ?, supplier_code = ?, ");
+			sql.append("name = ?, short_name = ?, barcode = ?, category_code = ?, ");
 			sql.append("unit_name = ?, reduced_tax_rate_flg = ?, price = ?, min_stock_qty = ?, ");
 			sql.append("update_user_code = ?, update_program = ? ");
 			sql.append("WHERE product_code = ? AND del_flg = '0'");
@@ -65,14 +66,13 @@ public class ProductUpdateProcess extends AbstractProcess {
 			ps.setString(2, req.shortName);
 			ps.setString(3, req.barcode);
 			ps.setString(4, req.categoryCode);
-			ps.setString(5, req.supplierCode);
-			ps.setString(6, req.unitName);
-			ps.setString(7, req.reducedTaxRateFlg);
-			ps.setBigDecimal(8, req.price);
-			ps.setInt(9, req.minStockQty != null ? req.minStockQty : 0);
-			ps.setString(10, req.accessInfo.userCode);
-			ps.setString(11, PRG_CD);
-			ps.setString(12, req.productCode);
+			ps.setString(5, req.unitName);
+			ps.setString(6, req.reducedTaxRateFlg);
+			ps.setBigDecimal(7, req.price);
+			ps.setInt(8, req.minStockQty != null ? req.minStockQty : 0);
+			ps.setString(9, req.accessInfo.userCode);
+			ps.setString(10, PRG_CD);
+			ps.setString(11, req.productCode);
 
 			int affected = ps.executeUpdate();
 			if (affected == 0) {
@@ -84,6 +84,8 @@ public class ProductUpdateProcess extends AbstractProcess {
 				throw new ProcessCheckErrorException(errors, ConstantValue.NORMAL_ERROR);
 			}
 
+			replaceSuppliers(dba, req);
+
 			res.productCode = req.productCode;
 			return res;
 
@@ -92,5 +94,26 @@ public class ProductUpdateProcess extends AbstractProcess {
 				ps.close();
 			}
 		}
+	}
+
+	/**
+	 * Chiến lược "thay hết": xoá toàn bộ dòng product_supplier cũ của sản
+	 * phẩm này rồi ghi lại đúng danh sách client gửi lên — đơn giản, đúng vì
+	 * client LUÔN gửi toàn bộ danh sách NCC mong muốn (không phải danh sách
+	 * thay đổi/diff), không cần so sánh thêm/bớt/sửa từng dòng.
+	 */
+	private void replaceSuppliers(DBAccessor dba, ProductUpdateRequest req) throws DBException {
+		DBStatement deletePs = null;
+		try {
+			deletePs = dba.prepareStatement("DELETE FROM product_supplier WHERE product_code = ?");
+			deletePs.setString(1, req.productCode);
+			deletePs.executeUpdate();
+		} finally {
+			if (deletePs != null) {
+				deletePs.close();
+			}
+		}
+
+		ProductSupplierWriter.insertAll(dba, req.productCode, req.suppliers, req.accessInfo.userCode, PRG_CD);
 	}
 }

@@ -57,6 +57,9 @@ còn `UNKNOWN`.
 - `.claude/retail-domain.md`
 - `.claude/task-workflows.md`
 - `.claude/review-checklist.md`
+- `.claude/seqno-convention.md` — BẮT BUỘC đọc trước khi tạo module mới cần
+  mã tự sinh (category_code/supplier_code/product_code và mọi mã tương
+  tự sau này) — dùng `SeqNoUtility`, không tự chế cơ chế sinh mã riêng.
 
 ## Quy Tắc Cốt Lõi
 
