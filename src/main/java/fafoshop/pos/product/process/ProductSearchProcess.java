@@ -19,8 +19,8 @@ import fafoshop.pos.product.dto.ProductSearchRequest;
 import fafoshop.pos.product.dto.ProductSearchResponse;
 
 /**
- * Tìm kiếm sản phẩm — API mẫu chứng minh pattern vertical-slice
- * (dto/process/webservice) hoạt động đúng trên bảng product. JDBC thuần qua
+ * Tìm kiếm sản phẩm (có phân trang/sắp xếp server-side, lọc theo danh
+ * mục/trạng thái) — API cho màn hình Product Master. JDBC thuần qua
  * DBAccessor/DBStatement, không ORM.
  */
 public class ProductSearchProcess extends AbstractProcess {
@@ -46,52 +46,84 @@ public class ProductSearchProcess extends AbstractProcess {
 		ProductSearchRequest req = (ProductSearchRequest) request;
 		ProductSearchResponse res = (ProductSearchResponse) response;
 
+		StringBuilder where = new StringBuilder();
+		List<String> params = new ArrayList<>();
+		ProductQueryHelper.buildWhereClause(req.keyword, req.categoryCode, req.statusFilter, where, params);
+
+		res.totalCount = queryTotalCount(dba, where.toString(), params);
+		res.rows = queryRows(dba, req, where.toString(), params);
+
+		return res;
+	}
+
+	private long queryTotalCount(DBAccessor dba, String where, List<String> params) throws DBException {
 		ResultSet rs = null;
 		DBStatement ps = null;
+		try {
+			String sql = "SELECT COUNT(*) AS cnt FROM product p " + where;
+			ps = dba.prepareStatement(sql);
+			bindParams(ps, params);
+			rs = ps.executeQuery();
+			return rs.next() ? rs.getLong("cnt") : 0L;
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			closeQuietly(rs, ps);
+		}
+	}
 
+	private List<ProductRowDto> queryRows(DBAccessor dba, ProductSearchRequest req, String where,
+			List<String> params) throws DBException {
+
+		String sortColumn = ProductQueryHelper.resolveSortColumn(req.sortField);
+		String sortDirection = ProductQueryHelper.resolveSortDirection(req.sortDirection);
+		int pageSize = req.pageSize > 0 ? req.pageSize : 20;
+		int pageIndex = Math.max(req.pageIndex, 0);
+
+		ResultSet rs = null;
+		DBStatement ps = null;
 		try {
 			StringBuilder sql = new StringBuilder();
-			sql.append("SELECT product_code, name, barcode, category_code, unit_name, price ");
-			sql.append("FROM product ");
-			sql.append("WHERE del_flg = '0' ");
-			boolean hasKeyword = req.keyword != null && !req.keyword.trim().isEmpty();
-			if (hasKeyword) {
-				sql.append("AND (name LIKE ? OR barcode = ?) ");
-			}
-			sql.append("ORDER BY name");
+			sql.append("SELECT ").append(ProductQueryHelper.SELECT_COLUMNS_SQL);
+			sql.append(ProductQueryHelper.FROM_JOIN_SQL);
+			sql.append(where);
+			sql.append("ORDER BY ").append(sortColumn).append(" ").append(sortDirection).append(" ");
+			sql.append("LIMIT ? OFFSET ?");
 
 			ps = dba.prepareStatement(sql);
-			if (hasKeyword) {
-				ps.setString(1, "%" + req.keyword.trim() + "%");
-				ps.setString(2, req.keyword.trim());
-			}
+			int idx = bindParams(ps, params);
+			ps.setInt(idx++, pageSize);
+			ps.setInt(idx++, pageIndex * pageSize);
 
 			rs = ps.executeQuery();
 
 			List<ProductRowDto> rows = new ArrayList<>();
 			while (rs.next()) {
-				ProductRowDto row = new ProductRowDto();
-				row.productCode = rs.getString("product_code");
-				row.name = rs.getString("name");
-				row.barcode = rs.getString("barcode");
-				row.categoryCode = rs.getString("category_code");
-				row.unitName = rs.getString("unit_name");
-				row.price = rs.getBigDecimal("price");
-				rows.add(row);
+				rows.add(ProductQueryHelper.mapRow(rs));
 			}
-			res.rows = rows;
-
-			return res;
+			return rows;
 
 		} catch (SQLException e) {
 			throw new DBException(e);
 		} finally {
-			try {
-				if (rs != null) rs.close();
-				if (ps != null) ps.close();
-			} catch (SQLException e) {
-				throw new DBException(e);
-			}
+			closeQuietly(rs, ps);
+		}
+	}
+
+	private int bindParams(DBStatement ps, List<String> params) throws DBException {
+		int idx = 1;
+		for (String param : params) {
+			ps.setString(idx++, param);
+		}
+		return idx;
+	}
+
+	private void closeQuietly(ResultSet rs, DBStatement ps) throws DBException {
+		try {
+			if (rs != null) rs.close();
+			if (ps != null) ps.close();
+		} catch (SQLException e) {
+			throw new DBException(e);
 		}
 	}
 }

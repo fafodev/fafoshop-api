@@ -13,8 +13,13 @@
 	<!--
 		pom.xml này CHỦ Ý tối giản — chỉ giữ dependency thật sự cần cho 1 API
 		bán lẻ (POS): Jersey (JAX-RS) + Jackson (JSON) + MySQL + log4j. Không
-		thêm JasperReports/barcode4j/POI/PDFBox/Azure/SendGrid/zip4j/msal4j hay
+		thêm JasperReports/barcode4j/PDFBox/Azure/SendGrid/zip4j/msal4j hay
 		dependency nào khác khi chưa có nhu cầu thật.
+
+		NGOẠI LỆ: Apache POI (poi-ooxml) được thêm CÓ CHỦ ĐÍCH cho tính năng
+		export Excel của màn Product Master (yêu cầu rõ ràng cho tính năng cụ
+		thể, không phải thêm "phòng khi cần") — xem
+		fafoshop.pos.product.process.ProductExportProcess.
 	-->
 
 	<build>
@@ -94,6 +99,12 @@
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
 			<version>8.0.30</version>
+		</dependency>
+		<!-- Xuất Excel (.xlsx) cho màn Product Master — bản 5.2.x tương thích JDK 8. -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.2.5</version>
 		</dependency>
 		<!-- log4j.xml + file rolling hàng ngày, không dùng logback để tránh
 			 silently mất log file (xem ghi chú exclusion phía trên). -->

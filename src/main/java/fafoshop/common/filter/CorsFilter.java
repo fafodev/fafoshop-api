@@ -58,5 +58,11 @@ public class CorsFilter implements ContainerRequestFilter, ContainerResponseFilt
 				"GET, POST, PUT, DELETE, OPTIONS, HEAD");
 		responseContext.getHeaders().putSingle("Access-Control-Max-Age", "3600");
 		responseContext.getHeaders().putSingle("Access-Control-Allow-Credentials", "true");
+		// Không khai header này thì JS phía trình duyệt không đọc được
+		// Content-Disposition qua response cross-origin (khác cổng
+		// 4200/8080 tính là cross-origin) — làm hỏng tên file gợi ý khi tải
+		// Excel/CSV ở màn Product Master (phát hiện qua test thủ công, xem
+		// ProductExportWebService/download-blob.util.ts phía frontend).
+		responseContext.getHeaders().putSingle("Access-Control-Expose-Headers", "Content-Disposition");
 	}
 }

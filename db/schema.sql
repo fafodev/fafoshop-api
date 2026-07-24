@@ -15,6 +15,29 @@ CREATE DATABASE IF NOT EXISTS fafoshop_pos
 USE fafoshop_pos;
 
 -- ----------------------------------------------------------------------------
+-- category — bảng mã DÙNG CHUNG nhiều nghiệp vụ (không riêng cho product).
+-- category_code là khoá chính DUY NHẤT (1 cột); category_type phân biệt
+-- bảng này đang phục vụ nghiệp vụ nào (PRODUCT = danh mục sản phẩm) để sau
+-- này tái dùng cho nghiệp vụ khác mà không cần tạo thêm bảng mã mới. Phải
+-- tạo trước product vì product.category_code tham chiếu khoá ngoại tới đây.
+-- ----------------------------------------------------------------------------
+CREATE TABLE category (
+  category_code    VARCHAR(4)    NOT NULL COMMENT 'Mã danh mục (khoá chính, bảng mã dùng chung nhiều nghiệp vụ)',
+  category_type    VARCHAR(20)   NOT NULL COMMENT 'Loại danh mục - phân biệt bảng này đang phục vụ nghiệp vụ nào (vd PRODUCT = danh mục sản phẩm)',
+  name             VARCHAR(100)  NOT NULL COMMENT 'Tên danh mục',
+  display_order    INT(9)        NOT NULL DEFAULT 0 COMMENT 'Thứ tự hiển thị',
+  del_flg          VARCHAR(1)    NOT NULL DEFAULT '0' COMMENT 'Cờ xoá mềm: 1=đã xoá, 0=còn hiệu lực',
+  entry_user_code  VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
+  entry_datetime   TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
+  entry_program    VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình tạo bản ghi',
+  update_user_code VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng cập nhật gần nhất',
+  update_datetime  TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm cập nhật gần nhất',
+  update_program   VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
+  PRIMARY KEY (category_code),
+  KEY idx_category_type (category_type)
+);
+
+-- ----------------------------------------------------------------------------
 -- product
 -- ----------------------------------------------------------------------------
 CREATE TABLE product (
@@ -37,7 +60,8 @@ CREATE TABLE product (
   update_program        VARCHAR(10)    NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
   PRIMARY KEY (product_code),
   KEY idx_product_barcode (barcode),
-  KEY idx_product_supplier_code (supplier_code)
+  KEY idx_product_supplier_code (supplier_code),
+  CONSTRAINT fk_product_category FOREIGN KEY (category_code) REFERENCES category (category_code)
 );
 
 -- ----------------------------------------------------------------------------
