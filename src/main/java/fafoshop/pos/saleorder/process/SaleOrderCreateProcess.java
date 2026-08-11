@@ -20,6 +20,7 @@ import fafoshop.common.exception.ProcessCheckErrorException;
 import fafoshop.common.process.AbstractProcess;
 import fafoshop.common.utility.MessageUtility;
 import fafoshop.common.utility.SeqNoUtility;
+import fafoshop.pos.saleorder.dto.PaymentMethod;
 import fafoshop.pos.saleorder.dto.SaleOrderCreateRequest;
 import fafoshop.pos.saleorder.dto.SaleOrderCreateResponse;
 import fafoshop.pos.saleorder.dto.SaleOrderItemDto;
@@ -28,9 +29,10 @@ import fafoshop.pos.saleorder.dto.SaleOrderItemDto;
  * Tạo đơn bán tại quầy (checkout POS thật — thay cho alert() trong
  * pos.component.ts, xem comment trên bảng sale_order trong db/schema.sql).
  *
- * Phạm vi lần này CHỈ lưu giao dịch xuống sale_order/sale_order_item làm nền
- * tảng cho báo cáo/xuất thuế SAU NÀY — KHÔNG tự tính thuế hay tạo mẫu hoá đơn
- * in cụ thể (retail-domain.md đánh dấu 2 phần đó UNKNOWN).
+ * Lưu giao dịch xuống sale_order/sale_order_item làm nền tảng cho báo
+ * cáo/xuất thuế SAU NÀY — KHÔNG tự tính thuế (retail-domain.md vẫn đánh dấu
+ * UNKNOWN). Có ghi nhận payment_method (CASH/TRANSFER) để phục vụ mẫu hoá
+ * đơn in + báo cáo sau này — xem docs/pos-in-hoa-don.md (gốc workspace).
  */
 public class SaleOrderCreateProcess extends AbstractProcess {
 
@@ -60,6 +62,7 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		SaleOrderCreateResponse res = (SaleOrderCreateResponse) response;
 
 		validateItems(req.items);
+		validatePaymentMethod(req.paymentMethod);
 
 		BigDecimal subtotal = BigDecimal.ZERO;
 		for (SaleOrderItemDto item : req.items) {
@@ -76,7 +79,7 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		Timestamp now = new Timestamp(System.currentTimeMillis());
 
 		insertSaleOrder(dba, saleOrderNo, branchCode, req.customerName, now, req.paidAmount, changeAmount,
-				req.accessInfo.userCode);
+				req.paymentMethod, req.accessInfo.userCode);
 		insertSaleOrderItems(dba, saleOrderNo, req.items, req.accessInfo.userCode);
 
 		res.saleOrderNo = saleOrderNo;
@@ -126,6 +129,15 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		}
 	}
 
+	private void validatePaymentMethod(String paymentMethod) throws ProcessCheckErrorException {
+		if (paymentMethod == null || paymentMethod.trim().isEmpty()) {
+			throwError("ME000097");
+		}
+		if (!PaymentMethod.isValid(paymentMethod)) {
+			throwError("ME000098");
+		}
+	}
+
 	/**
 	 * Chi nhánh của đơn bán = main_branch_code của thu ngân đang đăng nhập
 	 * (accessInfo hiện chưa mang branchCode, xem AccessInfoDto/AuthTokenFilter)
@@ -152,16 +164,17 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 	}
 
 	private void insertSaleOrder(DBAccessor dba, String saleOrderNo, String branchCode, String customerName,
-			Timestamp saleDatetime, BigDecimal paidAmount, BigDecimal changeAmount, String userCode) throws DBException {
+			Timestamp saleDatetime, BigDecimal paidAmount, BigDecimal changeAmount, String paymentMethod,
+			String userCode) throws DBException {
 
 		DBStatement ps = null;
 		try {
 			StringBuilder sql = new StringBuilder();
 			sql.append("INSERT INTO sale_order ");
 			sql.append("(sale_order_no, branch_code, customer_code, customer_name, sale_datetime, ");
-			sql.append(" paid_amount, change_amount, cashier_user_code, void_flg, ");
+			sql.append(" paid_amount, change_amount, payment_method, cashier_user_code, void_flg, ");
 			sql.append(" entry_user_code, entry_program, update_user_code, update_program) ");
-			sql.append("VALUES (?, ?, NULL, ?, ?, ?, ?, ?, '0', ?, ?, ?, ?)");
+			sql.append("VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, '0', ?, ?, ?, ?)");
 
 			ps = dba.prepareStatement(sql);
 			ps.setString(1, saleOrderNo);
@@ -170,11 +183,12 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 			ps.setTimestamp(4, saleDatetime);
 			ps.setBigDecimal(5, paidAmount);
 			ps.setBigDecimal(6, changeAmount);
-			ps.setString(7, userCode);
+			ps.setString(7, paymentMethod);
 			ps.setString(8, userCode);
-			ps.setString(9, PRG_CD);
-			ps.setString(10, userCode);
-			ps.setString(11, PRG_CD);
+			ps.setString(9, userCode);
+			ps.setString(10, PRG_CD);
+			ps.setString(11, userCode);
+			ps.setString(12, PRG_CD);
 			ps.executeUpdate();
 		} finally {
 			if (ps != null) {

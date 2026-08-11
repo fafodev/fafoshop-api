@@ -17,7 +17,8 @@ Toàn bộ bảng dùng CHUNG 1 quy ước đặt tên `snake_case` dễ đọc 
 | `app_function` + `function_permission` | Phân quyền theo chức năng | Mỗi Process tự khai `function_code` qua `getFuncId()`, không qua bảng trung gian nào. |
 | `customer` | Khách hàng mua lẻ tại quầy | |
 | `promotion` | Khuyến mãi | Chỉ khung — quy tắc áp dụng/chồng khuyến mãi: `UNKNOWN`. |
-| `sale_order` + `sale_order_item` | Đơn bán tại quầy (checkout POS) | |
+| `sale_order` + `sale_order_item` | Đơn bán tại quầy (checkout POS) | `sale_order.payment_method` (`CASH`/`TRANSFER`) ghi nhận phương thức thanh toán — xem `../../docs/pos-in-hoa-don.md`. |
+| `bank_account` | Tài khoản NH nhận tiền theo chi nhánh, dùng build QR chuyển khoản lúc in bill | PK = `branch_code` (1 chi nhánh 1 TK). Xem `../../docs/pos-in-hoa-don.md`. |
 | `session_token` | Lưu token phiên đăng nhập | Hạ tầng cho `AuthTokenFilter`. |
 | `v_daily_revenue`, `v_item_revenue` | Báo cáo doanh thu | Chỉ khung tổng hợp cơ bản (tổng tiền, số lượng theo ngày/sản phẩm) — công thức chi tiết hơn: `UNKNOWN`. |
 
@@ -40,7 +41,9 @@ quản lý khách hàng/khuyến mãi/chi nhánh.
 - Công thức báo cáo doanh thu chi tiết (theo ca làm việc, theo nhân viên,
   trừ hàng trả lại...) — `v_daily_revenue`/`v_item_revenue` chỉ là khung
   tổng hợp cơ bản (tổng tiền, số lượng theo ngày/sản phẩm).
-- Mẫu hoá đơn in cho khách.
+- ~~Mẫu hoá đơn in cho khách~~ — ĐÃ CÓ thiết kế, xem `../../docs/pos-in-hoa-don.md`
+  (không phải UNKNOWN nữa, nhưng vẫn phải đọc tài liệu đó trước khi đổi hành
+  vi in ấn).
 - Ma trận phân quyền chi tiết (ngoài 2 mã chức năng mẫu `PRDCT_VIEW`/
   `PRDCT_EDIT` đã seed để demo).
 

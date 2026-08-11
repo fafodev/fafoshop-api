@@ -5,9 +5,9 @@
 - Package gốc: `fafoshop`.
 - Hạ tầng dùng chung: `src/main/java/fafoshop/common`.
 - Module nghiệp vụ: `src/main/java/fafoshop/pos/<module>` (`auth`, `product`,
-  `category`, `supplier`, `saleorder`, `inboundreceipt`), mỗi module có
-  `dto/`, `process/`, `webservice/` — xem vai trò từng module trong
-  `retail-domain.md`.
+  `category`, `supplier`, `saleorder`, `inboundreceipt`, `bankaccount`), mỗi
+  module có `dto/`, `process/`, `webservice/` — xem vai trò từng module
+  trong `retail-domain.md`.
 - Bootstrap: `web.xml` (Jersey `ServletContainer`, quét package `fafoshop`,
   mount tại `/api/*`). Lúc dev cũng có thể chạy thẳng
   `fafoshop.FafoshopApplication` (Spring Boot embedded Tomcat, xem

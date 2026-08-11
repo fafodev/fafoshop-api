@@ -22,5 +22,8 @@ public class SaleOrderCreateRequest extends AbstractRequest {
 
 	public BigDecimal paidAmount;
 
+	/** Phương thức thanh toán: CASH = tiền mặt, TRANSFER = chuyển khoản. */
+	public String paymentMethod;
+
 	public List<SaleOrderItemDto> items;
 }

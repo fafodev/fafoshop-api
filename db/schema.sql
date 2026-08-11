@@ -163,6 +163,31 @@ CREATE TABLE branch (
 );
 
 -- ----------------------------------------------------------------------------
+-- bank_account — tài khoản ngân hàng nhận tiền theo chi nhánh, dùng để build
+-- mã QR chuyển khoản (chuẩn EMVCo/Napas247) lúc in hoá đơn POS. 1 chi nhánh
+-- hiện chỉ có 1 tài khoản nhận tiền chính (PK = branch_code) — đủ dùng cho
+-- quy mô hiện tại, mở rộng thêm cột/bảng phụ nếu sau này cần nhiều tài
+-- khoản/chi nhánh. Xem docs/pos-in-hoa-don.md (gốc workspace) để biết đầy đủ
+-- thiết kế luồng in.
+-- ----------------------------------------------------------------------------
+CREATE TABLE bank_account (
+  branch_code      VARCHAR(6)    NOT NULL COMMENT 'Mã chi nhánh nhận tiền (khoá chính)',
+  bank_bin         VARCHAR(6)    NOT NULL COMMENT 'Mã BIN ngân hàng theo chuẩn Napas (vd 970436 = Vietcombank)',
+  bank_name        VARCHAR(100)  NOT NULL COMMENT 'Tên ngân hàng hiển thị (vd Vietcombank)',
+  account_no       VARCHAR(30)   NOT NULL COMMENT 'Số tài khoản nhận tiền',
+  account_name     VARCHAR(100)  NOT NULL COMMENT 'Tên chủ tài khoản (không dấu, khớp thông tin ngân hàng)',
+  del_flg          VARCHAR(1)    NOT NULL DEFAULT '0' COMMENT 'Cờ xoá mềm: 1=đã xoá, 0=còn hiệu lực',
+  entry_user_code  VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
+  entry_datetime   TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
+  entry_program    VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình tạo bản ghi',
+  update_user_code VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng cập nhật gần nhất',
+  update_datetime  TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm cập nhật gần nhất',
+  update_program   VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
+  PRIMARY KEY (branch_code),
+  CONSTRAINT fk_bankaccount_branch FOREIGN KEY (branch_code) REFERENCES branch (branch_code)
+);
+
+-- ----------------------------------------------------------------------------
 -- stock — theo dõi tồn kho theo (branch_code, product_code), không theo dõi
 -- vị trí kho vật lý chi tiết (đơn giản hoá cho quy mô 1 cửa hàng nhỏ).
 -- ----------------------------------------------------------------------------
@@ -353,6 +378,7 @@ CREATE TABLE sale_order (
   sale_datetime     DATETIME      NOT NULL COMMENT 'Thời điểm bán hàng',
   paid_amount       DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'Số tiền khách thanh toán',
   change_amount     DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'Số tiền thối lại cho khách',
+  payment_method    VARCHAR(10)   NOT NULL DEFAULT 'CASH' COMMENT 'Phương thức thanh toán: CASH=tiền mặt, TRANSFER=chuyển khoản',
   cashier_user_code VARCHAR(8)    NOT NULL COMMENT 'Mã thu ngân thực hiện đơn',
   void_flg          VARCHAR(1)    NOT NULL DEFAULT '0' COMMENT 'Cờ đơn bị huỷ (thay cho xoá cứng): 1=đã huỷ, 0=còn hiệu lực',
   entry_user_code   VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',

@@ -9,3 +9,7 @@
 # Mat khau admin MySQL dung chung cho ca server (khong rieng project nay) —
 # KHONG commit, chi dung tam de bootstrap database/user luc dev.
 /db/mysql8.info
+
+# Log chay tay tren may dev (vd chay FafoshopApplication truc tiep khong qua
+# run-dev.ps1 luc debug) — may-cu-the, khong commit.
+*.log

@@ -37,6 +37,18 @@ VALUES
    'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
+-- Tài khoản NH nhận tiền của CN001 dùng build QR chuyển khoản lúc in bill —
+-- ĐÂY LÀ DỮ LIỆU GIẢ để test kỹ thuật (bank_bin/account_no không thật), PHẢI
+-- thay bằng số tài khoản thật trước khi dùng ngoài mục đích test. Xem
+-- docs/pos-in-hoa-don.md (gốc workspace).
+INSERT INTO bank_account
+  (branch_code, bank_bin, bank_name, account_no, account_name, del_flg,
+   entry_user_code, entry_program, update_user_code, update_program)
+VALUES
+  ('CN001', '970436', 'Vietcombank', '0000000000', 'CUA HANG FAFOMART', '0',
+   'system', 'SEED', 'system', 'SEED')
+ON DUPLICATE KEY UPDATE bank_bin = VALUES(bank_bin);
+
 INSERT INTO app_function
   (function_code, name, short_name, menu_show_flg, auth_required_flg, del_flg,
    entry_user_code, entry_program, update_user_code, update_program)
@@ -51,6 +63,7 @@ VALUES
   ('CTGR_EDIT', 'Sửa danh mục', 'Sửa DM', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('CTGR_DEL', 'Xoá danh mục', 'Xoá DM', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('SALE_CREAT', 'Tạo đơn bán POS', 'Bán hàng', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
+  ('SALE_PAY', 'Sửa phương thức thanh toán đơn bán', 'Sửa PTTT', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('INBND_CRT', 'Tạo phiếu nhập hàng', 'Nhập hàng', '1', '1', '0', 'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
@@ -75,6 +88,7 @@ VALUES
   ('admin', 'CTGR_EDIT', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'CTGR_DEL', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'SALE_CREAT', '1', 'system', 'SEED', 'system', 'SEED'),
+  ('admin', 'SALE_PAY', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'INBND_CRT', '1', 'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE auth_type = VALUES(auth_type);
 
