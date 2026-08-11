@@ -2,6 +2,10 @@
 /bin/
 /console/
 
+# File classpath tam do "mvn dependency:build-classpath" sinh ra (dung boi
+# run-dev.ps1 o goc workspace de chay nhanh backend) — may-cu-the, khong commit.
+/cp.txt
+
 # Mat khau admin MySQL dung chung cho ca server (khong rieng project nay) —
 # KHONG commit, chi dung tam de bootstrap database/user luc dev.
 /db/mysql8.info

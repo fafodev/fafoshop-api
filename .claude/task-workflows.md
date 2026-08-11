@@ -56,6 +56,15 @@ vấn đề này hơn — rủi ro lệch bản chủ yếu khi tự gọi `java
 - `mvn -o compile` để build nhanh (offline, dùng cache Maven local).
 - Bỏ `-o` khi thêm dependency mới cần tải từ Maven Central.
 - `mvn -o package` để đóng gói WAR đầy đủ khi cần kiểm tra kỹ hơn.
+- Có script `run-dev.ps1`/`stop-dev.ps1` ở gốc workspace
+  (`../run-dev.ps1` từ thư mục này) tự động hoá đúng cách #2 bên dưới (chạy
+  `FafoshopApplication`, JDK 8, port 8080) kèm luôn cả frontend `ng serve`
+  (4200) — dùng script này khi cần test nhanh qua trình duyệt/API thật thay
+  vì tự compile + dựng classpath tay như mô tả dưới đây. `-SkipBackendCompile`
+  bỏ qua bước `mvn -o compile` cho nhanh khi chỉ vừa sửa code frontend (backend
+  vẫn chạy, dùng class Java đã compile từ trước). `stop-dev.ps1` để dừng đúng
+  cách (theo port) thay vì Ctrl+C treo process. Chi tiết: `../CLAUDE.md` mục
+  "Chạy dev để test thủ công".
 - Chưa có test tự động (JUnit) — verify thủ công theo 1 trong 3 cách:
   1. Gọi trực tiếp `XxxProcess.execute()` từ 1 class `main()` tạm (nhanh,
      nhưng KHÔNG đi qua tầng Jersey/AuthTokenFilter/Jackson).
