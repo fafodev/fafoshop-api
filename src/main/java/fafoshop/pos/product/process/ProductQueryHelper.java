@@ -31,7 +31,8 @@ final class ProductQueryHelper {
 			+ "(SELECT GROUP_CONCAT(s2.name ORDER BY s2.name SEPARATOR ', ') FROM product_supplier ps2 "
 			+ " JOIN supplier s2 ON s2.supplier_code = ps2.supplier_code "
 			+ " WHERE ps2.product_code = p.product_code) AS supplier_names, "
-			+ "p.unit_name, p.reduced_tax_rate_flg, p.price, p.min_stock_qty, p.del_flg, p.update_datetime ";
+			+ "p.unit_name, p.reduced_tax_rate_flg, p.price, p.min_stock_qty, p.expiry_warning_days, "
+			+ "p.del_flg, p.update_datetime ";
 
 	static final String FROM_JOIN_SQL = "FROM product p "
 			+ "LEFT JOIN category c ON c.category_code = p.category_code ";
@@ -95,6 +96,7 @@ final class ProductQueryHelper {
 		row.reducedTaxRateFlg = rs.getString("reduced_tax_rate_flg");
 		row.price = rs.getBigDecimal("price");
 		row.minStockQty = rs.getInt("min_stock_qty");
+		row.expiryWarningDays = rs.getInt("expiry_warning_days");
 		row.delFlg = rs.getString("del_flg");
 		Timestamp updateDatetime = rs.getTimestamp("update_datetime");
 		row.updateDatetime = updateDatetime != null ? updateDatetime.toLocalDateTime().format(DATETIME_FMT) : null;

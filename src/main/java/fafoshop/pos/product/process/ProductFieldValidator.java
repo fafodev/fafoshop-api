@@ -36,6 +36,13 @@ final class ProductFieldValidator {
 		validateBarcodeUnique(dba, barcode, excludeProductCode);
 	}
 
+	/** null hợp lệ (Process tự áp mặc định 90 ngày) — chỉ chặn giá trị âm. */
+	static void validateExpiryWarningDays(Integer expiryWarningDays) throws ProcessCheckErrorException {
+		if (expiryWarningDays != null && expiryWarningDays < 0) {
+			throwError("ME000089");
+		}
+	}
+
 	private static void validateName(String name) throws ProcessCheckErrorException {
 		if (name == null || name.trim().isEmpty()) {
 			throwError("ME000064");

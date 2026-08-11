@@ -4,8 +4,10 @@
 
 - Package gốc: `fafoshop`.
 - Hạ tầng dùng chung: `src/main/java/fafoshop/common`.
-- Module nghiệp vụ: `src/main/java/fafoshop/pos/<module>`
-  (`auth`, `product`...), mỗi module có `dto/`, `process/`, `webservice/`.
+- Module nghiệp vụ: `src/main/java/fafoshop/pos/<module>` (`auth`, `product`,
+  `category`, `supplier`, `saleorder`, `inboundreceipt`), mỗi module có
+  `dto/`, `process/`, `webservice/` — xem vai trò từng module trong
+  `retail-domain.md`.
 - Bootstrap: `web.xml` (Jersey `ServletContainer`, quét package `fafoshop`,
   mount tại `/api/*`). Lúc dev cũng có thể chạy thẳng
   `fafoshop.FafoshopApplication` (Spring Boot embedded Tomcat, xem
@@ -22,9 +24,10 @@
   KHÔNG commit vì đây là quyền admin toàn server, không riêng project này).
 - Schema DDL tham khảo: `db/schema.sql` (nguồn chuẩn khi cần tạo lại DB).
 - Package manager: Maven (`pom.xml`), `mvn -o compile` để build offline.
-- Frontend tương ứng: `D:\00.SOURCE_WEB\fafoshop` (Angular POS, gọi API này
-  qua `/api/pos/...`) — CHƯA nối dây thật (frontend hiện còn dùng
-  `alert()`/state cục bộ).
+- Frontend tương ứng: `D:\00.SOURCE_WEB\fafoshop` (Angular, gọi API này qua
+  `/api/pos/...`) — ĐÃ nối dây thật cho POS (`pos.saleorder`), Sản phẩm,
+  Danh mục, Nhà cung cấp, Nhập hàng (`pos.inboundreceipt`); không còn dùng
+  `alert()`/state cục bộ cho các màn này.
 
 UNKNOWN:
 

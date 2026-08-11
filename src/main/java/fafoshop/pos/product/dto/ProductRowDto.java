@@ -18,6 +18,8 @@ public class ProductRowDto extends AbstractDto {
 	public String reducedTaxRateFlg;
 	public BigDecimal price;
 	public Integer minStockQty;
+	/** Số ngày cảnh báo trước hạn sử dụng — dùng ở màn Nhập hàng để cảnh báo khi hạn dùng nhập vào còn quá gần. */
+	public Integer expiryWarningDays;
 	public String delFlg;
 
 	/** Định dạng "yyyy-MM-dd HH:mm:ss" — dùng String để tránh phải thêm module Jackson JSR-310 chỉ cho 1 field. */

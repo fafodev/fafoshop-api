@@ -10,9 +10,11 @@ import fafoshop.common.utility.MessageUtility;
 
 /**
  * Nếu 1 exception thoát khỏi AbstractProcess.execute() (không nên xảy ra vì
- * execute() đã bắt hết, nhưng phòng hờ lỗi ngoài luồng đó — ví dụ lỗi parse
- * JSON request), trả đúng HTTP 500 thay vì lẫn vào lstFatalError của JSON
- * body như lỗi nghiệp vụ thông thường.
+ * execute() đã bắt hết, nhưng phòng hờ lỗi ngoài luồng đó), trả đúng HTTP 500
+ * thay vì lẫn vào lstFatalError của JSON body như lỗi nghiệp vụ thông
+ * thường. LƯU Ý: lỗi parse JSON request (Jackson) KHÔNG đi qua đây - JAX-RS
+ * luôn ưu tiên mapper khớp kiểu cụ thể hơn Throwable, xem
+ * {@link JsonRequestExceptionMapper} (đăng ký riêng, cùng khuôn trả lỗi).
  */
 @Provider
 public class SystemExceptionMapper implements ExceptionMapper<Throwable> {

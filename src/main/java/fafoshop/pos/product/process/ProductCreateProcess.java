@@ -55,6 +55,7 @@ public class ProductCreateProcess extends AbstractProcess {
 		ProductFieldValidator.validate(dba, req.name, req.price, req.barcode, null);
 		ProductCategoryValidator.validate(dba, req.categoryCode);
 		ProductSupplierValidator.validate(dba, req.suppliers);
+		ProductFieldValidator.validateExpiryWarningDays(req.expiryWarningDays);
 
 		String productCode = SeqNoUtility.generate(dba, SEQ_PREFIX, req.accessInfo.userCode, PRG_CD);
 
@@ -64,9 +65,9 @@ public class ProductCreateProcess extends AbstractProcess {
 			StringBuilder sql = new StringBuilder();
 			sql.append("INSERT INTO product ");
 			sql.append("(product_code, name, short_name, barcode, category_code, unit_name, ");
-			sql.append(" reduced_tax_rate_flg, price, min_stock_qty, ");
+			sql.append(" reduced_tax_rate_flg, price, min_stock_qty, expiry_warning_days, ");
 			sql.append(" entry_user_code, entry_program, update_user_code, update_program) ");
-			sql.append("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+			sql.append("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
 			ps = dba.prepareStatement(sql);
 			ps.setString(1, productCode);
@@ -78,10 +79,11 @@ public class ProductCreateProcess extends AbstractProcess {
 			ps.setString(7, req.reducedTaxRateFlg);
 			ps.setBigDecimal(8, req.price);
 			ps.setInt(9, req.minStockQty != null ? req.minStockQty : 0);
-			ps.setString(10, req.accessInfo.userCode);
-			ps.setString(11, PRG_CD);
-			ps.setString(12, req.accessInfo.userCode);
-			ps.setString(13, PRG_CD);
+			ps.setInt(10, req.expiryWarningDays != null ? req.expiryWarningDays : 90);
+			ps.setString(11, req.accessInfo.userCode);
+			ps.setString(12, PRG_CD);
+			ps.setString(13, req.accessInfo.userCode);
+			ps.setString(14, PRG_CD);
 			ps.executeUpdate();
 
 			ProductSupplierWriter.insertAll(dba, productCode, req.suppliers, req.accessInfo.userCode, PRG_CD);

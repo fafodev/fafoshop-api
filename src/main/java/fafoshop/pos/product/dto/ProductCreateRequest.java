@@ -15,6 +15,8 @@ public class ProductCreateRequest extends AbstractRequest {
 	public String reducedTaxRateFlg;
 	public BigDecimal price;
 	public Integer minStockQty;
+	/** Số ngày cảnh báo trước hạn sử dụng — null thì Process tự áp mặc định 90 ngày. */
+	public Integer expiryWarningDays;
 	/** Danh sách NCC gắn với sản phẩm — sản phẩm có thể có NHIỀU NCC (xem bảng product_supplier). */
 	public List<ProductSupplierDto> suppliers;
 }
