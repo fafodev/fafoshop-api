@@ -81,6 +81,7 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		insertSaleOrder(dba, saleOrderNo, branchCode, req.customerName, now, req.paidAmount, changeAmount,
 				req.paymentMethod, req.accessInfo.userCode);
 		insertSaleOrderItems(dba, saleOrderNo, req.items, req.accessInfo.userCode);
+		decrementStock(dba, branchCode, req.items, req.accessInfo.userCode);
 
 		res.saleOrderNo = saleOrderNo;
 		res.subtotal = subtotal;
@@ -222,6 +223,53 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 				ps.setString(8, PRG_CD);
 				ps.setString(9, userCode);
 				ps.setString(10, PRG_CD);
+				ps.executeUpdate();
+			}
+		} finally {
+			if (ps != null) {
+				ps.close();
+			}
+		}
+	}
+
+	/**
+	 * Trừ tồn kho theo (branch_code, product_code) sau khi bán — CÙNG
+	 * transaction với việc tạo đơn bán (đi đúng khung retry-deadlock có sẵn
+	 * của AbstractProcess, xem architecture.md).
+	 *
+	 * Nếu sản phẩm CHƯA có dòng tồn kho (chưa từng nhập hàng qua màn Nhập
+	 * hàng) hoặc tồn đang ghi nhận ÍT hơn số lượng bán ra, KHÔNG chặn giao
+	 * dịch và KHÔNG để tồn kho âm — coi như vừa "ghi nhận" đủ đúng bằng số
+	 * lượng bán ra rồi trừ ngay, tồn kho sau cùng về đúng 0
+	 * (GREATEST(..., 0)). Quyết định nghiệp vụ theo yêu cầu thực tế: cửa
+	 * hàng nhỏ nhiều khi bán hàng trước, nhập liệu tồn kho lịch sử sau —
+	 * không nên chặn bán hàng chỉ vì thiếu dữ liệu tồn kho.
+	 */
+	private void decrementStock(DBAccessor dba, String branchCode, List<SaleOrderItemDto> items, String userCode)
+			throws DBException {
+
+		DBStatement ps = null;
+		try {
+			String sql = "INSERT INTO stock "
+					+ "(branch_code, product_code, quality_code, expiry_date, stock_qty, available_qty, "
+					+ " entry_user_code, entry_program, update_user_code, update_program) "
+					+ "VALUES (?, ?, '01', NULL, 0, 0, ?, ?, ?, ?) "
+					+ "ON DUPLICATE KEY UPDATE "
+					+ "stock_qty = GREATEST(stock_qty - ?, 0), "
+					+ "available_qty = GREATEST(available_qty - ?, 0), "
+					+ "update_user_code = VALUES(update_user_code), "
+					+ "update_program = VALUES(update_program)";
+
+			ps = dba.prepareStatement(sql);
+			for (SaleOrderItemDto item : items) {
+				ps.setString(1, branchCode);
+				ps.setString(2, item.productCode);
+				ps.setString(3, userCode);
+				ps.setString(4, PRG_CD);
+				ps.setString(5, userCode);
+				ps.setString(6, PRG_CD);
+				ps.setInt(7, item.quantity);
+				ps.setInt(8, item.quantity);
 				ps.executeUpdate();
 			}
 		} finally {

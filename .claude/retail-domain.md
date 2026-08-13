@@ -11,7 +11,7 @@ Toàn bộ bảng dùng CHUNG 1 quy ước đặt tên `snake_case` dễ đọc 
 | `category` | Danh mục sản phẩm | Bảng mã dùng chung nhiều nghiệp vụ (`category_type` phân biệt, hiện chỉ có `PRODUCT`). |
 | `supplier` | Nhà cung cấp | |
 | `branch` | Cửa hàng/chi nhánh | |
-| `stock` | Tồn kho | Theo dõi theo (`branch_code`, `product_code`) — không theo dõi vị trí kho vật lý chi tiết theo lô/hạn dùng riêng (1 dòng duy nhất mỗi sản phẩm/chi nhánh), phù hợp quy mô cửa hàng nhỏ. `expiry_date` bị GHI ĐÈ bằng lô nhập gần nhất mỗi lần nhập thêm (`InboundReceiptCreateProcess.upsertStock`) — không phải FEFO thật theo từng lô, là giới hạn đã biết của thiết kế đơn giản hoá này. |
+| `stock` | Tồn kho | Theo dõi theo (`branch_code`, `product_code`) — không theo dõi vị trí kho vật lý chi tiết theo lô/hạn dùng riêng (1 dòng duy nhất mỗi sản phẩm/chi nhánh), phù hợp quy mô cửa hàng nhỏ. `expiry_date` bị GHI ĐÈ bằng lô nhập gần nhất mỗi lần nhập thêm (`InboundReceiptCreateProcess.upsertStock`) — không phải FEFO thật theo từng lô, là giới hạn đã biết của thiết kế đơn giản hoá này. CỘNG khi nhập (`InboundReceiptCreateProcess`), TRỪ khi bán (`SaleOrderCreateProcess.decrementStock` — floor tại 0, không chặn bán khi thiếu dữ liệu tồn kho, xem `../../docs/pos-tong-quan-dashboard.md` mục 5). POS KHÔNG kiểm tra tồn khả dụng trước khi cho bán. |
 | `inbound_receipt` + `inbound_receipt_item` | Nhập hàng (header + detail) — màn hình Nhập hàng, `pos.inboundreceipt` | Chỉ ghi nhận thực nhận, không có luồng lập kế hoạch nhập hàng (`planned_qty` = `actual_qty`). Lưu phiếu cộng thẳng vào `stock` + ghi đè `product.price` (giá bán sửa ngay trên lưới) trong CÙNG transaction, không qua bước duyệt riêng. Header có 5 cột `einvoice_*` lưu THAM CHIẾU hoá đơn điện tử NCC cung cấp (số hoá đơn/ký hiệu/ngày phát hành/mã tra cứu/link tra cứu) — tất cả optional, CHỈ lưu link, KHÔNG lưu file (chưa có hạ tầng lưu file). |
 | `app_user` | Người dùng | `password_hash` lưu HASH (PBKDF2WithHmacSHA256), không lưu plaintext. |
 | `app_function` + `function_permission` | Phân quyền theo chức năng | Mỗi Process tự khai `function_code` qua `getFuncId()`, không qua bảng trung gian nào. |
@@ -20,17 +20,22 @@ Toàn bộ bảng dùng CHUNG 1 quy ước đặt tên `snake_case` dễ đọc 
 | `sale_order` + `sale_order_item` | Đơn bán tại quầy (checkout POS) | `sale_order.payment_method` (`CASH`/`TRANSFER`) ghi nhận phương thức thanh toán — xem `../../docs/pos-in-hoa-don.md`. |
 | `bank_account` | Tài khoản NH nhận tiền theo chi nhánh, dùng build QR chuyển khoản lúc in bill | PK = `branch_code` (1 chi nhánh 1 TK). Xem `../../docs/pos-in-hoa-don.md`. |
 | `session_token` | Lưu token phiên đăng nhập | Hạ tầng cho `AuthTokenFilter`. |
-| `v_daily_revenue`, `v_item_revenue` | Báo cáo doanh thu | Chỉ khung tổng hợp cơ bản (tổng tiền, số lượng theo ngày/sản phẩm) — công thức chi tiết hơn: `UNKNOWN`. |
+| `v_daily_revenue`, `v_item_revenue` | Báo cáo doanh thu | Chỉ khung tổng hợp cơ bản (tổng tiền, số lượng theo ngày/sản phẩm) — công thức chi tiết hơn: `UNKNOWN`. Từ `pos.report` (mới), 2 view này được `DashboardSummaryProcess` đọc cho màn Tổng quan — trước đó tồn tại trong schema nhưng chưa có process/webservice nào dùng tới. |
 
 **Module đã có code Java hoàn chỉnh**: `pos.auth` (đăng nhập), `pos.product`
 (Sản phẩm), `pos.category` (Danh mục), `pos.supplier` (Nhà cung cấp),
-`pos.saleorder` (checkout POS), `pos.inboundreceipt` (Nhập hàng — chỉ có
-action `create`, chưa có màn xem lại lịch sử phiếu nhập đã lập).
+`pos.saleorder` (checkout POS, có trừ tồn kho), `pos.inboundreceipt` (Nhập
+hàng — chỉ có action `create`, chưa có màn xem lại lịch sử phiếu nhập đã
+lập), `pos.report` (Tổng quan — chỉ 1 action `dashboardSummary`, xem
+`../../docs/pos-tong-quan-dashboard.md`).
 
 **Module CHƯA code**: xem, sửa, xoá phiếu nhập đã lập (`inboundreceipt` mới
-chỉ có `create`); màn hình xem tồn kho (`stock`) riêng — hiện chỉ cộng dồn
-ngầm qua Nhập hàng, chưa có API/màn hình đọc lại; báo cáo doanh thu chi tiết;
-quản lý khách hàng/khuyến mãi/chi nhánh.
+chỉ có `create`); xoá/huỷ đơn bán (`saleorder` cũng chỉ có `create` + sửa
+phương thức thanh toán); màn hình xem/quản lý tồn kho (`stock`) ĐẦY ĐỦ —
+`pos.report.dashboardSummary` chỉ trả rút gọn 5 dòng tồn thấp + 5 dòng sắp
+hết hạn cho màn Tổng quan, chưa có màn liệt kê toàn bộ tồn kho; kiểm tra
+tồn kho khả dụng lúc bán (POS hiện cho bán bất kể tồn kho); báo cáo doanh
+thu chi tiết; quản lý khách hàng/khuyến mãi/chi nhánh.
 
 ## UNKNOWN — không được tự phát minh
 

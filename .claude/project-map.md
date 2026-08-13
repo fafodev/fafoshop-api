@@ -5,9 +5,11 @@
 - Package gốc: `fafoshop`.
 - Hạ tầng dùng chung: `src/main/java/fafoshop/common`.
 - Module nghiệp vụ: `src/main/java/fafoshop/pos/<module>` (`auth`, `product`,
-  `category`, `supplier`, `saleorder`, `inboundreceipt`, `bankaccount`), mỗi
-  module có `dto/`, `process/`, `webservice/` — xem vai trò từng module
-  trong `retail-domain.md`.
+  `category`, `supplier`, `saleorder`, `inboundreceipt`, `bankaccount`,
+  `report`), mỗi module có `dto/`, `process/`, `webservice/` — xem vai trò
+  từng module trong `retail-domain.md`. `report` (mới) chỉ có 1 action tổng
+  hợp `dashboardSummary` cho màn Tổng quan `fafoshop` — xem
+  `../../docs/pos-tong-quan-dashboard.md`.
 - Bootstrap: `web.xml` (Jersey `ServletContainer`, quét package `fafoshop`,
   mount tại `/api/*`). Lúc dev cũng có thể chạy thẳng
   `fafoshop.FafoshopApplication` (Spring Boot embedded Tomcat, xem
@@ -26,8 +28,12 @@
 - Package manager: Maven (`pom.xml`), `mvn -o compile` để build offline.
 - Frontend tương ứng: `D:\00.SOURCE_WEB\fafoshop` (Angular, gọi API này qua
   `/api/pos/...`) — ĐÃ nối dây thật cho POS (`pos.saleorder`), Sản phẩm,
-  Danh mục, Nhà cung cấp, Nhập hàng (`pos.inboundreceipt`); không còn dùng
-  `alert()`/state cục bộ cho các màn này.
+  Danh mục, Nhà cung cấp, Nhập hàng (`pos.inboundreceipt`), Tổng quan
+  (`pos.report`); không còn dùng `alert()`/state cục bộ cho các màn này.
+- `pos.saleorder.create` (`SaleOrderCreateProcess`) trừ tồn kho (`stock`)
+  ngay khi bán — floor tại 0 nếu tồn chưa ghi nhận đủ, KHÔNG chặn bán hàng
+  khi thiếu dữ liệu tồn kho lịch sử. Xem chi tiết + lý do
+  `docs/pos-tong-quan-dashboard.md` mục 5.
 
 UNKNOWN:
 
