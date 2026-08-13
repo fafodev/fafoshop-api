@@ -89,6 +89,21 @@ lên cloud, đã sửa lại thành cookie `HttpOnly`:
   khi cookie đã hết hạn/không có, vẫn phải trả cookie hết hạn (idempotent).
 - `AuthTokenFilter` đọc token từ `Cookie: fafoshop_session=...` (JAX-RS
   `requestContext.getCookies()`), KHÔNG còn đọc header `Authorization`.
+- **Gia hạn phiên theo hoạt động (sliding session)** — trước đây phiên có
+  hạn CỐ ĐỊNH tính từ lúc đăng nhập (`session.properties` phút), người dùng
+  thao tác liên tục vẫn bị văng ra `/login` giữa chừng dù đang tích cực
+  dùng. Giờ MỖI request mang token hợp lệ tự gia hạn cả 2 phía trong CÙNG
+  luồng xác thực:
+  - `IdTokenUtility.verify()` gia hạn `session_token.expire_datetime = NOW()
+    + sessionMinutes` ở DB (không cộng dồn từ hạn cũ — tính lại từ lúc gọi).
+  - `AuthTokenFilter` (giờ implement THÊM `ContainerResponseFilter`, không
+    chỉ `ContainerRequestFilter`) gia hạn lại `Max-Age` cookie phiên trên
+    MỌI response của request đã xác thực thành công — THIẾU bước này thì dù
+    DB đã gia hạn, trình duyệt vẫn tự xoá cookie đúng `Max-Age` cũ (set 1
+    lần lúc login) và ngừng gửi kèm, request vẫn nhận 401 dù DB còn hạn.
+  - Chỉ phiên THẬT SỰ bị bỏ quên (không có request nào trong
+    `sessionMinutes` phút liên tiếp) mới hết hạn tự nhiên — không phải hạn
+    cố định theo giờ đăng nhập nữa.
 - `CorsFilter` bật `Access-Control-Allow-Credentials: true` — bắt buộc để
   trình duyệt gửi/nhận cookie cross-origin (dev: Angular `4200` gọi API
   `8080`). Khi bật credentials, `Access-Control-Allow-Origin` PHẢI là origin
