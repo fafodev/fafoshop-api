@@ -78,7 +78,10 @@ public final class IdTokenUtility {
 	}
 
 	/**
-	 * Kiểm tra token, trả về mã người dùng nếu hợp lệ, null nếu không.
+	 * Kiểm tra token, trả về mã người dùng nếu hợp lệ, null nếu không. Token
+	 * còn hợp lệ thì GIA HẠN LUÔN {@code expire_datetime} thêm
+	 * {@code sessionMinutes} kể từ NGAY LÚC NÀY (sliding session) — xem
+	 * {@link #extendExpiry(DBAccessor, String)}.
 	 */
 	synchronized public static String verify(String encryptedToken) throws FatalException, DBException {
 
@@ -108,6 +111,14 @@ public final class IdTokenUtility {
 			if (rs.next()) {
 				usrCd = rs.getString("user_code");
 			}
+			rs.close();
+			ps.close();
+			ps = null;
+
+			if (usrCd != null) {
+				extendExpiry(dba, rawToken);
+			}
+
 			dba.commit();
 			return usrCd;
 
@@ -119,6 +130,38 @@ public final class IdTokenUtility {
 				if (ps != null) ps.close();
 				if (dba != null) dba.disconnect();
 			} catch (Exception ignore) {
+			}
+		}
+	}
+
+	/**
+	 * Gia hạn phiên theo hoạt động (sliding session): mỗi request mang token
+	 * hợp lệ đẩy {@code expire_datetime} thêm {@code sessionMinutes} tính từ
+	 * lúc gọi (KHÔNG phải cộng dồn từ hạn cũ), để người dùng đang thao tác
+	 * liên tục (vd ngồi nhập hàng đối chiếu giấy tờ hàng giờ liền) không bị
+	 * văng ra giữa chừng do hạn cố định tính từ lúc đăng nhập — chỉ phiên
+	 * THỰC SỰ bị bỏ quên (không có request nào trong {@code sessionMinutes}
+	 * phút liên tiếp) mới hết hạn tự nhiên. LƯU Ý: chỉ gia hạn ở DB — cookie
+	 * phiên phía trình duyệt (Max-Age cố định set lúc login) phải được gia
+	 * hạn RIÊNG ở {@code AuthTokenFilter}, thiếu bước đó thì trình duyệt vẫn
+	 * tự xoá cookie đúng hạn cũ dù DB còn hạn.
+	 */
+	private static void extendExpiry(DBAccessor dba, String rawToken) throws FatalException, DBException {
+		DBStatement ps = null;
+		try {
+			int sessionMinutes = getSessionMinutes();
+			Timestamp newExpireDatetime = new Timestamp(System.currentTimeMillis() + 60_000L * sessionMinutes);
+
+			ps = dba.prepareStatement("UPDATE session_token SET expire_datetime = ? WHERE token = ?");
+			ps.setTimestamp(1, newExpireDatetime);
+			ps.setString(2, rawToken);
+			ps.executeUpdate();
+		} catch (IOException e) {
+			throw new FatalException(e);
+		} finally {
+			try {
+				if (ps != null) ps.close();
+			} catch (DBException ignore) {
 			}
 		}
 	}
