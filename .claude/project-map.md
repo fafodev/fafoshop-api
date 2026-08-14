@@ -27,9 +27,11 @@
 - Schema DDL tham khảo: `db/schema.sql` (nguồn chuẩn khi cần tạo lại DB).
 - Package manager: Maven (`pom.xml`), `mvn -o compile` để build offline.
 - Frontend tương ứng: `D:\00.SOURCE_WEB\fafoshop` (Angular, gọi API này qua
-  `/api/pos/...`) — ĐÃ nối dây thật cho POS (`pos.saleorder`), Sản phẩm,
-  Danh mục, Nhà cung cấp, Nhập hàng (`pos.inboundreceipt`), Tổng quan
-  (`pos.report`); không còn dùng `alert()`/state cục bộ cho các màn này.
+  `/api/pos/...`) — ĐÃ nối dây thật cho POS (`pos.saleorder`, gồm cả màn tra
+  cứu bán hàng `pos.saleorder.search`/`detail`/`export` — xem
+  `docs/pos-tra-cuu-ban-hang.md`), Sản phẩm, Danh mục, Nhà cung cấp, Nhập
+  hàng (`pos.inboundreceipt`), Tổng quan (`pos.report`); không còn dùng
+  `alert()`/state cục bộ cho các màn này.
 - `pos.saleorder.create` (`SaleOrderCreateProcess`) trừ tồn kho (`stock`)
   ngay khi bán — floor tại 0 nếu tồn chưa ghi nhận đủ, KHÔNG chặn bán hàng
   khi thiếu dữ liệu tồn kho lịch sử. Xem chi tiết + lý do

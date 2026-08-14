@@ -97,7 +97,11 @@ public class SaleOrderUpdatePaymentMethodProcess extends AbstractProcess {
 
 	private void validateSaleOrderNo(String saleOrderNo) throws ProcessCheckErrorException {
 		if (saleOrderNo == null || saleOrderNo.trim().isEmpty()) {
-			throwError("ME000100");
+			// Trước đây dùng lại "ME000100" — TRÙNG key với DashboardSummaryProcess
+			// (Properties chỉ giữ giá trị của dòng cuối cùng trong file, khiến màn
+			// Tổng quan hiển thị nhầm thông báo này khi gõ sai định dạng ngày). Phát
+			// hiện lúc làm màn tra cứu đơn bán, sửa sang mã riêng "ME000120".
+			throwError("ME000120");
 		}
 	}
 
