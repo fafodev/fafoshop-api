@@ -13,4 +13,10 @@ public class SaleOrderDetailItemDto extends AbstractDto {
 	public BigDecimal unitPrice;
 	public int quantity;
 	public BigDecimal lineAmount;
+
+	/** Giá vốn bình quân gia quyền TẠI THỜI ĐIỂM bán — NULL nếu sản phẩm chưa từng có phiếu nhập tính đến lúc bán (không phải giá vốn = 0). */
+	public BigDecimal unitCost;
+
+	/** Lãi của dòng = lineAmount - unitCost*quantity — NULL nếu unitCost NULL. */
+	public BigDecimal lineProfit;
 }

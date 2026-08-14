@@ -17,7 +17,7 @@ Toàn bộ bảng dùng CHUNG 1 quy ước đặt tên `snake_case` dễ đọc 
 | `app_function` + `function_permission` | Phân quyền theo chức năng | Mỗi Process tự khai `function_code` qua `getFuncId()`, không qua bảng trung gian nào. |
 | `customer` | Khách hàng mua lẻ tại quầy | |
 | `promotion` | Khuyến mãi | Chỉ khung — quy tắc áp dụng/chồng khuyến mãi: `UNKNOWN`. |
-| `sale_order` + `sale_order_item` | Đơn bán tại quầy (checkout POS) | `sale_order.payment_method` (`CASH`/`TRANSFER`) ghi nhận phương thức thanh toán — xem `../../docs/pos-in-hoa-don.md`. Có màn tra cứu (`pos.saleorder.search`/`detail`/`export`) — xem `../../docs/pos-tra-cuu-ban-hang.md`. |
+| `sale_order` + `sale_order_item` | Đơn bán tại quầy (checkout POS) | `sale_order.payment_method` (`CASH`/`TRANSFER`) ghi nhận phương thức thanh toán — xem `../../docs/pos-in-hoa-don.md`. Có màn tra cứu (`pos.saleorder.search`/`detail`/`export`) — xem `../../docs/pos-tra-cuu-ban-hang.md`. `sale_order_item.unit_cost` (mới, xem mục Giá vốn bên dưới) chụp giá vốn TẠI THỜI ĐIỂM bán, dùng tính "tiền lãi" trên màn tra cứu. |
 | `bank_account` | Tài khoản NH nhận tiền theo chi nhánh, dùng build QR chuyển khoản lúc in bill | PK = `branch_code` (1 chi nhánh 1 TK). Xem `../../docs/pos-in-hoa-don.md`. |
 | `session_token` | Lưu token phiên đăng nhập | Hạ tầng cho `AuthTokenFilter`. |
 | `v_daily_revenue`, `v_item_revenue` | Báo cáo doanh thu | Chỉ khung tổng hợp cơ bản (tổng tiền, số lượng theo ngày/sản phẩm) — công thức chi tiết hơn: `UNKNOWN`. Từ `pos.report` (mới), 2 view này được `DashboardSummaryProcess` đọc cho màn Tổng quan — trước đó tồn tại trong schema nhưng chưa có process/webservice nào dùng tới. |
@@ -39,11 +39,37 @@ hết hạn cho màn Tổng quan, chưa có màn liệt kê toàn bộ tồn kho
 tồn kho khả dụng lúc bán (POS hiện cho bán bất kể tồn kho); báo cáo doanh
 thu chi tiết; quản lý khách hàng/khuyến mãi/chi nhánh.
 
+## Giá vốn & tiền lãi — ĐÃ CHỐT (không còn UNKNOWN)
+
+Trước đây "giá vốn tồn kho" là UNKNOWN. Người dùng đã CHỐT công thức khi
+yêu cầu thêm cột "tiền lãi" ở màn tra cứu bán hàng:
+
+- **Giá vốn = bình quân gia quyền TẤT CẢ phiếu nhập của sản phẩm tính đến
+  hiện tại** (`SUM(actual_qty*unit_cost)/SUM(actual_qty)` trên
+  `inbound_receipt_item`, lọc theo `branch_code`) — KHÔNG phải FIFO.
+- **CHỤP LẠI (snapshot) NGAY LÚC TẠO ĐƠN BÁN**, lưu vào
+  `sale_order_item.unit_cost` (xem
+  `SaleOrderCreateProcess.queryWeightedAvgUnitCost`) — giống cách
+  `unit_price` được chụp lại, KHÔNG tính lại giá vốn khi xem báo cáo sau
+  này (giá nhập mới hơn KHÔNG làm thay đổi lãi của đơn đã bán trong quá
+  khứ).
+- `unit_cost` NULL (KHÔNG phải 0) nếu sản phẩm CHƯA TỪNG có phiếu nhập tính
+  đến lúc bán. Đơn bán tạo TRƯỚC migration
+  `db/migration_add_sale_order_item_unit_cost.sql` cũng NULL — KHÔNG
+  backfill tự động (không có cơ sở tính đúng giá vốn tại đúng thời điểm đã
+  bán trong quá khứ).
+- Tiền lãi 1 đơn = NULL (không phải 0) nếu BẤT KỲ dòng hàng nào có
+  `unit_cost` NULL — tránh hiển thị số liệu thiếu 1 phần chi phí mà không
+  cảnh báo. Xem `SaleOrderQueryHelper.PROFIT_SUBQUERY_SQL`.
+- Vẫn CHƯA làm "Tổng giá trị tồn kho" (giá vốn × tồn kho hiện tại) — khác
+  mục đích với "lãi từng đơn bán", chưa có yêu cầu cụ thể.
+
+Chi tiết đầy đủ: `../../docs/pos-tra-cuu-ban-hang.md` mục giá vốn/lãi.
+
 ## UNKNOWN — không được tự phát minh
 
 - Quy tắc thuế (VAT, hàng miễn thuế...).
 - Quy tắc làm tròn tiền khi thanh toán.
-- Giá vốn tồn kho (bình quân gia quyền, FIFO...).
 - Quy tắc khuyến mãi chồng nhau, điều kiện áp dụng khuyến mãi.
 - Công thức báo cáo doanh thu chi tiết (theo ca làm việc, theo nhân viên,
   trừ hàng trả lại...) — `v_daily_revenue`/`v_item_revenue` chỉ là khung

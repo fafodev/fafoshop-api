@@ -32,17 +32,37 @@ final class SaleOrderQueryHelper {
 	}
 
 	/**
-	 * total_amount/item_count lấy qua SUBQUERY vô hướng (không phải JOIN
-	 * thường) — 1 đơn bán có NHIỀU dòng hàng (sale_order_item), JOIN thường sẽ
-	 * nhân dòng và làm sai COUNT(*)/phân trang. Subquery giữ nguyên 1 dòng/đơn
-	 * bán, cùng kỹ thuật ProductQueryHelper dùng cho supplier_names.
+	 * Subquery vô hướng tính lãi 1 đơn bán — tách hằng số riêng vì dùng LẶP LẠI
+	 * ở nhiều nơi: SELECT_COLUMNS_SQL (danh sách), SaleOrderSearchProcess
+	 * (query tổng lãi cộng dồn), SaleOrderDetailProcess (lãi 1 đơn cụ thể).
+	 * KHAI BÁO TRƯỚC SELECT_COLUMNS_SQL — field static final tham chiếu nhau
+	 * trong Java bị lỗi biên dịch "illegal forward reference" nếu field được
+	 * dùng khai báo SAU field dùng nó.
+	 *
+	 * profit_amount = SUM(line_amount - unit_cost*quantity) trên TOÀN BỘ dòng
+	 * hàng của đơn — nhưng trả NULL (không phải 0) nếu BẤT KỲ dòng nào thiếu
+	 * unit_cost (sản phẩm dòng đó chưa từng có phiếu nhập tính đến lúc bán,
+	 * xem SaleOrderCreateProcess.queryWeightedAvgUnitCost), để KHÔNG hiển thị
+	 * lãi sai (thiếu 1 phần chi phí) mà không cảnh báo — tốt hơn cho người
+	 * dùng biết "chưa xác định" thay vì con số sai lệch.
+	 */
+	static final String PROFIT_SUBQUERY_SQL = "(SELECT CASE WHEN SUM(CASE WHEN soi3.unit_cost IS NULL THEN 1 ELSE 0 END) > 0 "
+			+ "THEN NULL ELSE SUM(soi3.line_amount - soi3.unit_cost * soi3.quantity) END "
+			+ "FROM sale_order_item soi3 WHERE soi3.sale_order_no = so.sale_order_no)";
+
+	/**
+	 * total_amount/item_count/profit_amount lấy qua SUBQUERY vô hướng (không
+	 * phải JOIN thường) — 1 đơn bán có NHIỀU dòng hàng (sale_order_item), JOIN
+	 * thường sẽ nhân dòng và làm sai COUNT(*)/phân trang. Subquery giữ nguyên
+	 * 1 dòng/đơn bán, cùng kỹ thuật ProductQueryHelper dùng cho supplier_names.
 	 */
 	static final String SELECT_COLUMNS_SQL = "so.sale_order_no, so.branch_code, so.customer_name, "
 			+ "so.sale_datetime, so.payment_method, so.paid_amount, so.change_amount, "
 			+ "so.cashier_user_code, u.name AS cashier_name, so.void_flg, "
 			+ "(SELECT COALESCE(SUM(soi2.line_amount), 0) FROM sale_order_item soi2 "
 			+ " WHERE soi2.sale_order_no = so.sale_order_no) AS total_amount, "
-			+ "(SELECT COUNT(*) FROM sale_order_item soi2 WHERE soi2.sale_order_no = so.sale_order_no) AS item_count ";
+			+ "(SELECT COUNT(*) FROM sale_order_item soi2 WHERE soi2.sale_order_no = so.sale_order_no) AS item_count, "
+			+ PROFIT_SUBQUERY_SQL + " AS profit_amount ";
 
 	static final String FROM_JOIN_SQL = "FROM sale_order so "
 			+ "LEFT JOIN app_user u ON u.user_code = so.cashier_user_code ";
@@ -56,6 +76,7 @@ final class SaleOrderQueryHelper {
 		SORT_COLUMN_MAP.put("paidAmount", "so.paid_amount");
 		SORT_COLUMN_MAP.put("totalAmount", "total_amount");
 		SORT_COLUMN_MAP.put("itemCount", "item_count");
+		SORT_COLUMN_MAP.put("profitAmount", "profit_amount");
 	}
 
 	/**
@@ -190,6 +211,7 @@ final class SaleOrderQueryHelper {
 		row.cashierUserCode = rs.getString("cashier_user_code");
 		row.cashierName = rs.getString("cashier_name");
 		row.voidFlg = rs.getString("void_flg");
+		row.profitAmount = rs.getBigDecimal("profit_amount"); // getBigDecimal trả null đúng khi cột SQL là NULL
 		return row;
 	}
 

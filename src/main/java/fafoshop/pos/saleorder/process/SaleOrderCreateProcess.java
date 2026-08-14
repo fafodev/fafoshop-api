@@ -1,6 +1,7 @@
 package fafoshop.pos.saleorder.process;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -80,7 +81,7 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 
 		insertSaleOrder(dba, saleOrderNo, branchCode, req.customerName, now, req.paidAmount, changeAmount,
 				req.paymentMethod, req.accessInfo.userCode);
-		insertSaleOrderItems(dba, saleOrderNo, req.items, req.accessInfo.userCode);
+		insertSaleOrderItems(dba, saleOrderNo, branchCode, req.items, req.accessInfo.userCode);
 		decrementStock(dba, branchCode, req.items, req.accessInfo.userCode);
 
 		res.saleOrderNo = saleOrderNo;
@@ -198,20 +199,21 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		}
 	}
 
-	private void insertSaleOrderItems(DBAccessor dba, String saleOrderNo, List<SaleOrderItemDto> items,
-			String userCode) throws DBException {
+	private void insertSaleOrderItems(DBAccessor dba, String saleOrderNo, String branchCode,
+			List<SaleOrderItemDto> items, String userCode) throws DBException {
 
 		DBStatement ps = null;
 		try {
 			String sql = "INSERT INTO sale_order_item "
-					+ "(sale_order_no, line_no, product_code, unit_price, quantity, line_amount, "
+					+ "(sale_order_no, line_no, product_code, unit_price, quantity, line_amount, unit_cost, "
 					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 			ps = dba.prepareStatement(sql);
 			int lineNo = 1;
 			for (SaleOrderItemDto item : items) {
 				BigDecimal lineAmount = item.unitPrice.multiply(BigDecimal.valueOf(item.quantity));
+				BigDecimal unitCost = queryWeightedAvgUnitCost(dba, branchCode, item.productCode);
 
 				ps.setString(1, saleOrderNo);
 				ps.setInt(2, lineNo++);
@@ -219,16 +221,61 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 				ps.setBigDecimal(4, item.unitPrice);
 				ps.setInt(5, item.quantity);
 				ps.setBigDecimal(6, lineAmount);
-				ps.setString(7, userCode);
-				ps.setString(8, PRG_CD);
-				ps.setString(9, userCode);
-				ps.setString(10, PRG_CD);
+				// setBigDecimal(idx, null) được MySQL Connector/J xử lý đúng như SQL
+				// NULL (khác setInt/setLong kiểu nguyên thuỷ không nhận null được) —
+				// không cần setNull() riêng.
+				ps.setBigDecimal(7, unitCost);
+				ps.setString(8, userCode);
+				ps.setString(9, PRG_CD);
+				ps.setString(10, userCode);
+				ps.setString(11, PRG_CD);
 				ps.executeUpdate();
 			}
 		} finally {
 			if (ps != null) {
 				ps.close();
 			}
+		}
+	}
+
+	/**
+	 * Giá vốn BÌNH QUÂN GIA QUYỀN của sản phẩm tại chi nhánh, tính từ TẤT CẢ
+	 * phiếu nhập tính đến hiện tại (SUM(actual_qty*unit_cost)/SUM(actual_qty)
+	 * trên inbound_receipt_item) — chụp lại NGAY LÚC bán vào
+	 * sale_order_item.unit_cost, KHÔNG tính lại khi xem báo cáo sau này (khác
+	 * cách unit_price được lưu, cùng tinh thần "chụp giá tại thời điểm giao
+	 * dịch"). Quyết định công thức này đã CHỐT theo yêu cầu người dùng — xem
+	 * docs/pos-tra-cuu-ban-hang.md (gốc workspace) và retail-domain.md.
+	 *
+	 * Trả về NULL nếu sản phẩm CHƯA TỪNG có phiếu nhập nào (KHÔNG trả 0 —
+	 * tránh hiểu nhầm "giá vốn bằng 0" khiến lãi bị tính SAI thành bằng đúng
+	 * doanh thu).
+	 */
+	private BigDecimal queryWeightedAvgUnitCost(DBAccessor dba, String branchCode, String productCode)
+			throws DBException {
+		ResultSet rs = null;
+		DBStatement ps = null;
+		try {
+			String sql = "SELECT SUM(actual_qty * unit_cost) AS total_cost, SUM(actual_qty) AS total_qty "
+					+ "FROM inbound_receipt_item WHERE branch_code = ? AND product_code = ? AND actual_qty > 0";
+			ps = dba.prepareStatement(sql);
+			ps.setString(1, branchCode);
+			ps.setString(2, productCode);
+			rs = ps.executeQuery();
+
+			if (!rs.next()) {
+				return null;
+			}
+			BigDecimal totalCost = rs.getBigDecimal("total_cost");
+			BigDecimal totalQty = rs.getBigDecimal("total_qty");
+			if (totalCost == null || totalQty == null || totalQty.signum() <= 0) {
+				return null;
+			}
+			return totalCost.divide(totalQty, 2, RoundingMode.HALF_UP);
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			closeQuietly(rs, ps);
 		}
 	}
 

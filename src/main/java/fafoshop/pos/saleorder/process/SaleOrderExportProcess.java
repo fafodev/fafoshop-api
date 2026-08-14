@@ -2,6 +2,7 @@ package fafoshop.pos.saleorder.process;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -44,8 +45,13 @@ public class SaleOrderExportProcess extends AbstractProcess {
 
 	private static final String[] HEADERS = {
 			"Số đơn bán", "Ngày giờ bán", "Khách hàng", "Thu ngân", "Phương thức thanh toán",
-			"Số dòng hàng", "Tổng tiền hàng", "Khách trả", "Tiền thối", "Trạng thái"
+			"Số dòng hàng", "Tổng tiền hàng", "Tiền lãi", "Khách trả", "Tiền thối", "Trạng thái"
 	};
+
+	/** "" khi profitAmount NULL (chưa xác định giá vốn) — KHÔNG hiển thị "0" (dễ hiểu nhầm là lãi = 0 thay vì "chưa rõ"). */
+	private String profitCell(BigDecimal profitAmount) {
+		return profitAmount != null ? profitAmount.toPlainString() : "";
+	}
 
 	public SaleOrderExportProcess(ILogSender logSender) {
 		super(logSender);
@@ -150,6 +156,7 @@ public class SaleOrderExportProcess extends AbstractProcess {
 					paymentMethodLabel(row.paymentMethod),
 					String.valueOf(row.itemCount),
 					row.totalAmount != null ? row.totalAmount.toPlainString() : "",
+					profitCell(row.profitAmount),
 					row.paidAmount != null ? row.paidAmount.toPlainString() : "",
 					row.changeAmount != null ? row.changeAmount.toPlainString() : "",
 					"1".equals(row.voidFlg) ? "Đã huỷ" : "Còn hiệu lực"
@@ -221,9 +228,15 @@ public class SaleOrderExportProcess extends AbstractProcess {
 				setCell(dataRow, 4, paymentMethodLabel(row.paymentMethod));
 				dataRow.createCell(5).setCellValue(row.itemCount);
 				dataRow.createCell(6).setCellValue(row.totalAmount != null ? row.totalAmount.doubleValue() : 0d);
-				dataRow.createCell(7).setCellValue(row.paidAmount != null ? row.paidAmount.doubleValue() : 0d);
-				dataRow.createCell(8).setCellValue(row.changeAmount != null ? row.changeAmount.doubleValue() : 0d);
-				setCell(dataRow, 9, "1".equals(row.voidFlg) ? "Đã huỷ" : "Còn hiệu lực");
+				// Để Ô TRỐNG (không set giá trị) khi chưa xác định giá vốn — KHÔNG set 0,
+				// tránh hiểu nhầm "lãi = 0" (xem profitCell() ở bản CSV cùng lý do).
+				Cell profitCell = dataRow.createCell(7);
+				if (row.profitAmount != null) {
+					profitCell.setCellValue(row.profitAmount.doubleValue());
+				}
+				dataRow.createCell(8).setCellValue(row.paidAmount != null ? row.paidAmount.doubleValue() : 0d);
+				dataRow.createCell(9).setCellValue(row.changeAmount != null ? row.changeAmount.doubleValue() : 0d);
+				setCell(dataRow, 10, "1".equals(row.voidFlg) ? "Đã huỷ" : "Còn hiệu lực");
 			}
 
 			ByteArrayOutputStream bos = new ByteArrayOutputStream();

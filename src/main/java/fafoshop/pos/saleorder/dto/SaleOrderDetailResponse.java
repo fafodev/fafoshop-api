@@ -19,6 +19,10 @@ public class SaleOrderDetailResponse extends AbstractResponse {
 	public BigDecimal paidAmount;
 	public BigDecimal changeAmount;
 	public BigDecimal subtotal;
+
+	/** Tổng lãi của đơn — NULL nếu BẤT KỲ dòng hàng nào chưa xác định được giá vốn (xem SaleOrderDetailItemDto.unitCost). */
+	public BigDecimal profitAmount;
+
 	public String cashierUserCode;
 	public String cashierName;
 	public String voidFlg;

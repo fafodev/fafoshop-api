@@ -107,7 +107,7 @@ public class SaleOrderDetailProcess extends AbstractProcess {
 		DBStatement ps = null;
 		try {
 			String sql = "SELECT soi.line_no, soi.product_code, p.name AS product_name, p.barcode, "
-					+ "soi.unit_price, soi.quantity, soi.line_amount "
+					+ "soi.unit_price, soi.quantity, soi.line_amount, soi.unit_cost "
 					+ "FROM sale_order_item soi LEFT JOIN product p ON p.product_code = soi.product_code "
 					+ "WHERE soi.sale_order_no = ? ORDER BY soi.line_no ASC";
 			ps = dba.prepareStatement(sql);
@@ -115,6 +115,8 @@ public class SaleOrderDetailProcess extends AbstractProcess {
 			rs = ps.executeQuery();
 
 			BigDecimal subtotal = BigDecimal.ZERO;
+			BigDecimal profitAmount = BigDecimal.ZERO;
+			boolean hasUnknownCost = false;
 			while (rs.next()) {
 				SaleOrderDetailItemDto item = new SaleOrderDetailItemDto();
 				item.lineNo = rs.getInt("line_no");
@@ -124,10 +126,22 @@ public class SaleOrderDetailProcess extends AbstractProcess {
 				item.unitPrice = rs.getBigDecimal("unit_price");
 				item.quantity = rs.getInt("quantity");
 				item.lineAmount = rs.getBigDecimal("line_amount");
+				item.unitCost = rs.getBigDecimal("unit_cost");
+				if (item.unitCost != null) {
+					item.lineProfit = item.lineAmount.subtract(item.unitCost.multiply(BigDecimal.valueOf(item.quantity)));
+					profitAmount = profitAmount.add(item.lineProfit);
+				} else {
+					hasUnknownCost = true; // sản phẩm dòng này chưa từng có phiếu nhập lúc bán — không tính được lãi TOÀN đơn
+				}
 				res.items.add(item);
 				subtotal = subtotal.add(item.lineAmount);
 			}
 			res.subtotal = subtotal;
+			// Chỉ trả tổng lãi khi ĐỦ giá vốn cho TẤT CẢ dòng — 1 dòng thiếu là
+			// đủ để coi tổng lãi "chưa xác định" (NULL), tránh hiển thị số THIẾU
+			// 1 phần chi phí mà không cảnh báo, cùng nguyên tắc với
+			// SaleOrderQueryHelper.PROFIT_SUBQUERY_SQL.
+			res.profitAmount = hasUnknownCost ? null : profitAmount;
 
 		} catch (SQLException e) {
 			throw new DBException(e);

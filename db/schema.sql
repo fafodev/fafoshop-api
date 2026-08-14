@@ -399,6 +399,7 @@ CREATE TABLE sale_order_item (
   unit_price       DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'Đơn giá bán tại thời điểm giao dịch',
   quantity         INT(9)        NOT NULL DEFAULT 1 COMMENT 'Số lượng bán',
   line_amount      DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'Thành tiền của dòng (đơn giá × số lượng)',
+  unit_cost        DECIMAL(12,2) NULL COMMENT 'Giá vốn BÌNH QUÂN GIA QUYỀN của sản phẩm tại THỜI ĐIỂM bán (chụp lại lúc tạo đơn, tính từ SUM(actual_qty*unit_cost)/SUM(actual_qty) trên inbound_receipt_item theo branch_code — xem SaleOrderCreateProcess). NULL = sản phẩm CHƯA TỪNG có phiếu nhập nào tính đến lúc bán, KHÔNG xác định được giá vốn (không phải giá vốn = 0) — đơn tạo TRƯỚC khi field này ra đời cũng NULL, không backfill tự động.',
   entry_user_code  VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
   entry_datetime   TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
   entry_program    VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình tạo bản ghi',

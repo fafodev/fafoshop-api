@@ -57,6 +57,7 @@ public class SaleOrderSearchProcess extends AbstractProcess {
 
 		res.totalCount = queryTotalCount(dba, where.toString(), params);
 		res.sumTotalAmount = querySumTotalAmount(dba, where.toString(), params);
+		queryProfitSummary(dba, where.toString(), params, res);
 		res.rows = queryRows(dba, req, where.toString(), params);
 
 		return res;
@@ -89,6 +90,36 @@ public class SaleOrderSearchProcess extends AbstractProcess {
 			SaleOrderQueryHelper.bindParams(ps, params);
 			rs = ps.executeQuery();
 			return rs.next() ? rs.getBigDecimal("sum_amount") : BigDecimal.ZERO;
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			SaleOrderQueryHelper.closeQuietly(rs, ps);
+		}
+	}
+
+	/**
+	 * Tổng lãi cộng dồn CHỈ trên các đơn ĐÃ XÁC ĐỊNH đầy đủ giá vốn + đếm số
+	 * đơn CHƯA xác định được (profit_amount NULL) — bọc PROFIT_SUBQUERY_SQL
+	 * (vốn là subquery vô hướng theo dòng) trong 1 bảng dẫn xuất (derived
+	 * table) để SUM/COUNT được trên kết quả đã tính theo từng đơn, KHÔNG được
+	 * SUM trực tiếp 1 subquery tương quan trong GROUP BY.
+	 */
+	private void queryProfitSummary(DBAccessor dba, String where, List<String> params, SaleOrderSearchResponse res)
+			throws DBException {
+		ResultSet rs = null;
+		DBStatement ps = null;
+		try {
+			String sql = "SELECT COALESCE(SUM(t.profit_amount), 0) AS sum_profit, "
+					+ "SUM(CASE WHEN t.profit_amount IS NULL THEN 1 ELSE 0 END) AS unknown_count FROM ("
+					+ "SELECT " + SaleOrderQueryHelper.PROFIT_SUBQUERY_SQL + " AS profit_amount "
+					+ SaleOrderQueryHelper.FROM_JOIN_SQL + where + ") t";
+			ps = dba.prepareStatement(sql);
+			SaleOrderQueryHelper.bindParams(ps, params);
+			rs = ps.executeQuery();
+			if (rs.next()) {
+				res.sumProfitAmount = rs.getBigDecimal("sum_profit");
+				res.unknownCostOrderCount = rs.getLong("unknown_count");
+			}
 		} catch (SQLException e) {
 			throw new DBException(e);
 		} finally {

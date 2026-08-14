@@ -20,6 +20,14 @@ public class SaleOrderRowDto extends AbstractDto {
 	/** Tổng tiền hàng của đơn (SUM line_amount) — tính qua subquery, KHÔNG phải cột trực tiếp trên sale_order. */
 	public BigDecimal totalAmount;
 
+	/**
+	 * Tiền lãi của đơn = SUM(line_amount - unit_cost*quantity). NULL (KHÔNG
+	 * phải 0) nếu BẤT KỲ dòng hàng nào chưa xác định được giá vốn (sản phẩm
+	 * dòng đó chưa từng có phiếu nhập tính đến lúc bán) — xem
+	 * SaleOrderQueryHelper.PROFIT_SUBQUERY_SQL.
+	 */
+	public BigDecimal profitAmount;
+
 	/** Số dòng hàng trong đơn (COUNT sale_order_item) — không phải tổng số lượng. */
 	public int itemCount;
 
