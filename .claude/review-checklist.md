@@ -24,3 +24,8 @@
   `retail-domain.md`.
 - Không thêm dependency Maven không cần thiết.
 - Đã chạy `mvn -o compile` (hoặc `package`) và báo cáo kết quả.
+- **DTO mới/sửa kế thừa `AbstractDto` có field nullable** (`BigDecimal`,
+  `String`... có thể `null`) → nhắc/kiểm tra code frontend dùng field đó có
+  check CẢ `undefined` không, không chỉ `=== null` — field Java `null` bị
+  `@JsonInclude(NON_NULL)` lược khỏi JSON, FE nhận `undefined` (xem
+  `coding-rules.md`, đã gây crash thật ở màn Tra cứu bán hàng).

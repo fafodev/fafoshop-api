@@ -26,3 +26,13 @@
   từng gây lỗi `Data too long for column`).
 - Mật khẩu luôn qua `PasswordUtility.hash()`/`verify()` — không lưu/so sánh
   plaintext.
+- **Field DTO kế thừa `AbstractDto` (`@JsonInclude(Include.NON_NULL)`) mà
+  giá trị Java là `null` sẽ bị LƯỢC HẲN khỏi JSON trả về, KHÔNG gửi
+  `"field": null`.** Frontend nhận được `undefined` cho field đó, không phải
+  `null` — nếu FE chỉ check `=== null` (không check cả `undefined`) sẽ crash
+  khi gọi tiếp method trên giá trị (vd `.toLocaleString()`). Đã xảy ra thật 2
+  lần với `SaleOrderRowDto.profitAmount`/`SaleOrderDetailItemDto.lineProfit`
+  (màn Tra cứu bán hàng, xem `fafoshop/.claude/coding-rules.md` mục tương
+  ứng). Thêm field nullable mới vào DTO kế thừa `AbstractDto` → PHẢI báo rõ
+  cho phía frontend (hoặc tự kiểm tra code FE dùng field đó) là giá trị có
+  thể `undefined`, không chỉ `null`.
