@@ -87,7 +87,12 @@ public class ProductSearchProcess extends AbstractProcess {
 			sql.append("SELECT ").append(ProductQueryHelper.SELECT_COLUMNS_SQL);
 			sql.append(ProductQueryHelper.FROM_JOIN_SQL);
 			sql.append(where);
-			sql.append("ORDER BY ").append(sortColumn).append(" ").append(sortDirection).append(" ");
+			// Ưu tiên khớp CHÍNH XÁC (barcode/tên) lên đầu trước khi cắt trang —
+			// xem Javadoc buildOrderByClause(), sửa bug "khớp chính xác bị rớt
+			// khỏi trang đầu" khi có nhiều khớp lỏng (LIKE) đứng trước theo sort
+			// mặc định. params dùng CHUNG list với WHERE — append thêm đúng thứ
+			// tự để khớp đúng vị trí "?" trong sql (WHERE rồi mới tới ORDER BY).
+			sql.append(ProductQueryHelper.buildOrderByClause(req.keyword, sortColumn, sortDirection, params));
 			sql.append("LIMIT ? OFFSET ?");
 
 			ps = dba.prepareStatement(sql);

@@ -83,6 +83,31 @@ final class ProductQueryHelper {
 		return "DESC".equalsIgnoreCase(sortDirection) ? "DESC" : "ASC";
 	}
 
+	/**
+	 * ORDER BY ưu tiên khớp CHÍNH XÁC (barcode hoặc tên) lên đầu kết quả,
+	 * TRƯỚC khi mới sắp theo sortColumn/sortDirection bình thường — chỉ dùng
+	 * ở ProductSearchProcess (CÓ phân trang qua LIMIT). Lý do cần: trước đây
+	 * sort mặc định theo p.name ASC, nếu 1 lượt tìm theo keyword (dùng LIKE
+	 * lỏng ở buildWhereClause) trả về NHIỀU sản phẩm khớp lỏng đứng trước sản
+	 * phẩm khớp CHÍNH XÁC theo thứ tự tên, sản phẩm khớp chính xác có thể bị
+	 * cắt mất khỏi trang đầu (LIMIT pageSize nhỏ, vd 5 dòng ở
+	 * InboundReceiptComponent.linkLine()/autoLinkByExactName() phía frontend)
+	 * dù THẬT SỰ tồn tại trong DB — lỗi thật đã gặp: nhập hàng qua JSON tự
+	 * liên kết theo tên xong nhưng ô mã vạch hiện trống do không định vị lại
+	 * được sản phẩm khớp tên/mã vạch chính xác. KHÔNG áp dụng khi không có
+	 * keyword (không có khái niệm "khớp chính xác" để ưu tiên).
+	 */
+	static String buildOrderByClause(String keyword, String sortColumn, String sortDirection, List<String> params) {
+		StringBuilder orderBy = new StringBuilder("ORDER BY ");
+		if (keyword != null && !keyword.trim().isEmpty()) {
+			orderBy.append("CASE WHEN p.barcode = ? OR p.name = ? THEN 0 ELSE 1 END, ");
+			params.add(keyword.trim());
+			params.add(keyword.trim());
+		}
+		orderBy.append(sortColumn).append(" ").append(sortDirection).append(" ");
+		return orderBy.toString();
+	}
+
 	static ProductRowDto mapRow(ResultSet rs) throws SQLException {
 		ProductRowDto row = new ProductRowDto();
 		row.productCode = rs.getString("product_code");
