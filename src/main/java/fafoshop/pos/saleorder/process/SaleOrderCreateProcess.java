@@ -68,7 +68,7 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		BigDecimal subtotal = BigDecimal.ZERO;
 		for (SaleOrderItemDto item : req.items) {
 			validateItemExists(dba, item.productCode);
-			subtotal = subtotal.add(item.unitPrice.multiply(BigDecimal.valueOf(item.quantity)));
+			subtotal = subtotal.add(effectiveLineAmount(item));
 		}
 
 		validatePaidAmount(req.paidAmount, subtotal);
@@ -104,7 +104,35 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 			if (item.unitPrice == null || item.unitPrice.signum() < 0) {
 				throwError("ME000067");
 			}
+			validateLineAmount(item);
 		}
+	}
+
+	/**
+	 * `lineAmount` (nếu client gửi — xem Javadoc `SaleOrderItemDto.lineAmount`)
+	 * KHÔNG được âm và KHÔNG được lệch quá `quantity` đồng so với
+	 * `unitPrice × quantity` — biên đủ rộng để chấp nhận sai số làm tròn thật
+	 * (luôn &lt;1đ/đơn vị khi quy đổi đơn vị đóng gói không chia hết), đủ hẹp
+	 * để chặn 1 client bất thường tự gửi `lineAmount` sai lệch lớn nhằm khai
+	 * thấp tiền thu.
+	 */
+	private void validateLineAmount(SaleOrderItemDto item) throws ProcessCheckErrorException {
+		if (item.lineAmount == null) {
+			return;
+		}
+		if (item.lineAmount.signum() < 0) {
+			throwError("ME000126");
+		}
+		BigDecimal computed = item.unitPrice.multiply(BigDecimal.valueOf(item.quantity));
+		BigDecimal maxDrift = BigDecimal.valueOf(item.quantity);
+		if (item.lineAmount.subtract(computed).abs().compareTo(maxDrift) > 0) {
+			throwError("ME000126");
+		}
+	}
+
+	/** `lineAmount` do client gửi (nếu có) ưu tiên hơn `unitPrice × quantity` tự tính — xem Javadoc `SaleOrderItemDto.lineAmount`. */
+	private BigDecimal effectiveLineAmount(SaleOrderItemDto item) {
+		return item.lineAmount != null ? item.lineAmount : item.unitPrice.multiply(BigDecimal.valueOf(item.quantity));
 	}
 
 	private void validateItemExists(DBAccessor dba, String productCode) throws DBException, ProcessCheckErrorException {
@@ -212,7 +240,7 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 			ps = dba.prepareStatement(sql);
 			int lineNo = 1;
 			for (SaleOrderItemDto item : items) {
-				BigDecimal lineAmount = item.unitPrice.multiply(BigDecimal.valueOf(item.quantity));
+				BigDecimal lineAmount = effectiveLineAmount(item);
 				BigDecimal unitCost = queryWeightedAvgUnitCost(dba, branchCode, item.productCode);
 
 				ps.setString(1, saleOrderNo);

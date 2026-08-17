@@ -11,4 +11,20 @@ public class SaleOrderItemDto {
 	public BigDecimal unitPrice;
 
 	public Integer quantity;
+
+	/**
+	 * Thành tiền CHÍNH XÁC của dòng — KHÔNG BẮT BUỘC, chỉ gửi khi dòng hàng
+	 * đến từ quy đổi đơn vị đóng gói (Lốc/Thùng, xem
+	 * UnitChooserDialogComponent/docs/pos-da-don-vi-tinh.md) mà tổng tiền cấu
+	 * hình cho đơn vị đó KHÔNG CHIA HẾT cho số lượng lẻ quy đổi ra (vd 1 Thùng
+	 * 500.000đ = 24 cái → giá lẻ làm tròn 20.833đ × 24 = 499.992đ, LỆCH 8đ so
+	 * với giá đã cấu hình). Khi có giá trị, server dùng THẲNG làm line_amount
+	 * thay vì tính lại `unitPrice × quantity` (tránh làm tròn 2 lần khiến tiền
+	 * thu SAI lệch so với giá đã cấu hình) — server vẫn validate lệch so với
+	 * `unitPrice × quantity` không vượt quá `quantity` đồng (đủ rộng cho sai
+	 * số làm tròn tối đa &lt;1đ/đơn vị, đủ hẹp để chặn gian lận gửi thành tiền
+	 * tuỳ ý). null/không gửi → server tự tính `unitPrice × quantity` như cũ
+	 * (đa số dòng hàng quét/gõ tay bình thường).
+	 */
+	public BigDecimal lineAmount;
 }
