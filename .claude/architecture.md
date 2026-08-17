@@ -7,7 +7,8 @@ Jersey JAX-RS + JDBC thuần, vertical-slice theo module — xem phần "Quyết
 
 ```
 Client (Angular POS)
-  → AuthTokenFilter (@Provider, kiểm tra Bearer token, trừ @NoAuth)
+  → AuthTokenFilter (@Provider, kiểm tra token đọc từ cookie phiên
+    HttpOnly, trừ @NoAuth)
   → XxxWebService (@Path, JAX-RS resource) — gọi executeProcess(request)
   → AbstractWebService.executeProcess() — gán accessInfo.userCode từ token đã
     xác thực, gọi process.execute(request)
@@ -65,6 +66,14 @@ chung 1 class).
   `seq_no` trong CÙNG transaction của Process gọi tới. Xem đầy đủ quy ước
   (định dạng mã, danh sách prefix đã đăng ký, cách thêm prefix mới) tại
   `.claude/seqno-convention.md`.
+- `common/health` — `GET /api/health` (`fafoshop.common.health`, theo đúng
+  cấu trúc `dto/process/webservice` chuẩn, chỉ khác chỗ dùng `@GET` thay vì
+  `@POST` — cố ý, xem Javadoc `HealthWebService`), `@NoAuth`, `getFuncId()`
+  mặc định null nên `checkAuth()` bỏ qua. Trả `{ok, dbOk, serverTime}`, ping
+  DB thật (`SELECT 1`) nhưng tự bắt lỗi, KHÔNG throw ra ngoài nếu DB chưa lên
+  (trả `dbOk:false` kèm HTTP 200 thay vì rơi vào `lstFatalError`) — dùng cho
+  watchdog/script khởi động production, xem
+  `../../docs/pos-deploy-production.md`.
 
 ## Xác thực (auth) — chi tiết cookie phiên
 

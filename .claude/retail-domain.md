@@ -77,8 +77,9 @@ Chi tiết đầy đủ: `../../docs/pos-tra-cuu-ban-hang.md` mục giá vốn/l
 - ~~Mẫu hoá đơn in cho khách~~ — ĐÃ CÓ thiết kế, xem `../../docs/pos-in-hoa-don.md`
   (không phải UNKNOWN nữa, nhưng vẫn phải đọc tài liệu đó trước khi đổi hành
   vi in ấn).
-- Ma trận phân quyền chi tiết (ngoài 2 mã chức năng mẫu `PRDCT_VIEW`/
-  `PRDCT_EDIT` đã seed để demo).
+- Ma trận phân quyền chi tiết (ngoài các mã chức năng đã seed để demo:
+  `PRDCT_VIEW`/`PRDCT_EDIT`, `SALE_PAY` (sửa PTTT), `SALE_VIEW` (tra cứu bán
+  hàng), `RPT_VIEW` (Tổng quan)).
 
 Các phần trên phải ghi rõ `UNKNOWN` trong code/tài liệu mới cho tới khi có
 yêu cầu nghiệp vụ cụ thể.
