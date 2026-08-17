@@ -7,9 +7,15 @@
 - Module nghiệp vụ: `src/main/java/fafoshop/pos/<module>` (`auth`, `product`,
   `category`, `supplier`, `saleorder`, `inboundreceipt`, `bankaccount`,
   `report`), mỗi module có `dto/`, `process/`, `webservice/` — xem vai trò
-  từng module trong `retail-domain.md`. `report` (mới) chỉ có 1 action tổng
+  từng module trong `retail-domain.md`. `report` chỉ có 1 action tổng
   hợp `dashboardSummary` cho màn Tổng quan `fafoshop` — xem
-  `../../docs/pos-tong-quan-dashboard.md`.
+  `../../docs/pos-tong-quan-dashboard.md`. `product` có thêm action
+  `unit/list` + field `productUnits` trong create/update (bảng con
+  `product_unit` — đơn vị đóng gói Lốc/Thùng, xem
+  `../../docs/pos-da-don-vi-tinh.md`). `saleorder`/`inboundreceipt` có
+  thêm action `update`/`void` (sửa/huỷ đơn bán/phiếu nhập đã tạo — xem
+  `../../docs/pos-sua-huy-don.md`), `inboundreceipt` có thêm
+  `search`/`detail` (trước đây CHỈ có `create`).
 - Bootstrap: `web.xml` (Jersey `ServletContainer`, quét package `fafoshop`,
   mount tại `/api/*`). Lúc dev cũng có thể chạy thẳng
   `fafoshop.FafoshopApplication` (Spring Boot embedded Tomcat, xem
@@ -42,4 +48,6 @@ UNKNOWN:
 - Quy tắc thuế, làm tròn tiền.
 - Quy tắc khuyến mãi chồng nhau.
 - Công thức báo cáo doanh thu chi tiết (theo ca, theo nhân viên...).
-- Giá vốn tồn kho (giá vốn bình quân/FIFO...).
+- "Tổng giá trị tồn kho" (giá vốn × tồn kho hiện tại) — KHÁC "giá vốn 1 sản
+  phẩm" (đã CHỐT — bình quân gia quyền, xem `retail-domain.md` mục "Giá vốn
+  & tiền lãi"), mục này vẫn UNKNOWN vì chưa có yêu cầu cụ thể.
