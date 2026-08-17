@@ -65,6 +65,8 @@ VALUES
   ('SALE_CREAT', 'Tạo đơn bán POS', 'Bán hàng', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('SALE_PAY', 'Sửa phương thức thanh toán đơn bán', 'Sửa PTTT', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('SALE_VIEW', 'Tra cứu đơn bán hàng', 'Tra cứu bán', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
+  ('SALE_EDIT', 'Sửa/huỷ đơn bán (tự tạo, 15 phút)', 'Sửa đơn bán', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
+  ('SALE_MGR', 'QL sửa/huỷ đơn bán (không giới hạn)', 'QL đơn bán', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('INBND_CRT', 'Tạo phiếu nhập hàng', 'Nhập hàng', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('RPT_VIEW', 'Xem tổng quan/báo cáo', 'Tổng quan', '1', '1', '0', 'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
@@ -92,6 +94,8 @@ VALUES
   ('admin', 'SALE_CREAT', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'SALE_PAY', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'SALE_VIEW', '1', 'system', 'SEED', 'system', 'SEED'),
+  ('admin', 'SALE_EDIT', '1', 'system', 'SEED', 'system', 'SEED'),
+  ('admin', 'SALE_MGR', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'INBND_CRT', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'RPT_VIEW', '1', 'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE auth_type = VALUES(auth_type);
