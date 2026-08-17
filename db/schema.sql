@@ -252,6 +252,7 @@ CREATE TABLE inbound_receipt (
   einvoice_issue_date   DATE          NULL COMMENT 'Ngày phát hành hoá đơn điện tử (nếu có)',
   einvoice_lookup_code  VARCHAR(50)   NULL COMMENT 'Mã tra cứu hoá đơn điện tử trên cổng NCC/Tổng cục Thuế (nếu có)',
   einvoice_url          VARCHAR(500)  NULL COMMENT 'Đường dẫn tra cứu/xem hoá đơn điện tử trên cổng NCC/Tổng cục Thuế (nếu có) - KHÔNG phải file upload, chỉ lưu link tham chiếu',
+  void_flg               VARCHAR(1)    NOT NULL DEFAULT '0' COMMENT 'Cờ phiếu bị huỷ (thay cho xoá cứng): 1=đã huỷ, 0=còn hiệu lực',
   del_flg               VARCHAR(1)    NOT NULL DEFAULT '0' COMMENT 'Cờ xoá mềm: 1=đã xoá, 0=còn hiệu lực',
   entry_user_code       VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
   entry_datetime        TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
