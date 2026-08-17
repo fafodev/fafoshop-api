@@ -234,8 +234,9 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		try {
 			String sql = "INSERT INTO sale_order_item "
 					+ "(sale_order_no, line_no, product_code, unit_price, quantity, line_amount, unit_cost, "
+					+ " unit_name, unit_qty, "
 					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 			ps = dba.prepareStatement(sql);
 			int lineNo = 1;
@@ -253,10 +254,15 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 				// NULL (khác setInt/setLong kiểu nguyên thuỷ không nhận null được) —
 				// không cần setNull() riêng.
 				ps.setBigDecimal(7, unitCost);
-				ps.setString(8, userCode);
-				ps.setString(9, PRG_CD);
+				// unitName rỗng/null (đơn vị lẻ, đa số dòng hàng) → setString tự set
+				// SQL NULL (xem DBStatement.setString), unitQty dùng setNullableInt
+				// vì Integer (khác int nguyên thuỷ của setInt) mới nhận được null.
+				ps.setString(8, item.unitName);
+				ps.setNullableInt(9, item.unitQty);
 				ps.setString(10, userCode);
 				ps.setString(11, PRG_CD);
+				ps.setString(12, userCode);
+				ps.setString(13, PRG_CD);
 				ps.executeUpdate();
 			}
 		} finally {

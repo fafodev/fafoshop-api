@@ -70,7 +70,7 @@ public class InboundReceiptCreateProcess extends AbstractProcess {
 			validateItemExists(dba, item.productCode);
 			Date expiryDate = parseExpiryDate(item.expiryDate);
 			expiryDates.add(expiryDate);
-			totalAmount = totalAmount.add(item.unitCost.multiply(BigDecimal.valueOf(item.quantity)));
+			totalAmount = totalAmount.add(effectiveLineAmount(item));
 		}
 
 		validateSupplierExists(dba, req.supplierCode);
@@ -109,7 +109,40 @@ public class InboundReceiptCreateProcess extends AbstractProcess {
 			if (item.price == null || item.price.signum() < 0) {
 				throwError("ME000067");
 			}
+			// Dòng thêm qua đơn vị đóng gói (unitName khác null) BẮT BUỘC giá bán
+			// > 0 thật sự (không chỉ >= 0 như dòng đơn vị lẻ) — chặn ở tầng server
+			// phòng client bỏ qua kiểm tra phía FE, tránh lặp lại đúng bug đã phát
+			// hiện (fafomart_bug_report.md): dòng thêm qua "Vỉ" âm thầm dùng giá
+			// bán CŨ của đơn vị lẻ mà không ai xác nhận lại.
+			if (item.unitName != null && !item.unitName.trim().isEmpty()
+					&& (item.price == null || item.price.signum() <= 0)) {
+				throwError("ME000128");
+			}
+			validateLineAmount(item);
 		}
+	}
+
+	/**
+	 * `lineAmount` do client gửi (nếu có) ưu tiên hơn `unitCost × quantity` tự
+	 * tính — mirror SaleOrderCreateProcess.effectiveLineAmount/validateLineAmount
+	 * (xem Javadoc InboundReceiptItemDto.lineAmount).
+	 */
+	private void validateLineAmount(InboundReceiptItemDto item) throws ProcessCheckErrorException {
+		if (item.lineAmount == null) {
+			return;
+		}
+		if (item.lineAmount.signum() < 0) {
+			throwError("ME000127");
+		}
+		BigDecimal computed = item.unitCost.multiply(BigDecimal.valueOf(item.quantity));
+		BigDecimal maxDrift = BigDecimal.valueOf(item.quantity);
+		if (item.lineAmount.subtract(computed).abs().compareTo(maxDrift) > 0) {
+			throwError("ME000127");
+		}
+	}
+
+	private BigDecimal effectiveLineAmount(InboundReceiptItemDto item) {
+		return item.lineAmount != null ? item.lineAmount : item.unitCost.multiply(BigDecimal.valueOf(item.quantity));
 	}
 
 	private Date parseExpiryDate(String expiryDate) throws ProcessCheckErrorException {
@@ -277,9 +310,9 @@ public class InboundReceiptCreateProcess extends AbstractProcess {
 		try {
 			String sql = "INSERT INTO inbound_receipt_item "
 					+ "(branch_code, receipt_no, line_no, product_code, quality_code, expiry_date, "
-					+ " planned_qty, actual_qty, unit_cost, note, "
+					+ " planned_qty, actual_qty, unit_cost, unit_name, unit_qty, line_amount, price, note, "
 					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)";
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)";
 
 			ps = dba.prepareStatement(sql);
 			int lineNo = 1;
@@ -295,10 +328,14 @@ public class InboundReceiptCreateProcess extends AbstractProcess {
 				ps.setInt(7, item.quantity);
 				ps.setInt(8, item.quantity);
 				ps.setBigDecimal(9, item.unitCost);
-				ps.setString(10, userCode);
-				ps.setString(11, PRG_CD);
-				ps.setString(12, userCode);
-				ps.setString(13, PRG_CD);
+				ps.setString(10, item.unitName);
+				ps.setNullableInt(11, item.unitQty);
+				ps.setBigDecimal(12, effectiveLineAmount(item));
+				ps.setBigDecimal(13, item.price);
+				ps.setString(14, userCode);
+				ps.setString(15, PRG_CD);
+				ps.setString(16, userCode);
+				ps.setString(17, PRG_CD);
 				ps.executeUpdate();
 			}
 		} finally {

@@ -119,6 +119,25 @@ public class DBStatement {
 		}
 	}
 
+	/**
+	 * Set tham số kiểu số nguyên CÓ THỂ NULL thật (khác `setInt` chỉ nhận
+	 * `int` nguyên thuỷ, không set được SQL NULL) — dùng cho cột nullable kiểu
+	 * `Integer` (vd `sale_order_item.unit_qty`/`inbound_receipt_item.unit_qty`,
+	 * xem docs/pos-da-don-vi-tinh.md).
+	 */
+	public void setNullableInt(int parameterIndex, Integer x) throws DBException {
+		try {
+			params.append("[" + parameterIndex + "-" + x + "]");
+			if (x == null) {
+				ps.setNull(parameterIndex, java.sql.Types.INTEGER);
+			} else {
+				ps.setInt(parameterIndex, x);
+			}
+		} catch (SQLException e) {
+			throw new DBException(e);
+		}
+	}
+
 	public void setBigDecimal(int parameterIndex, BigDecimal x) throws DBException {
 		try {
 			params.append("[" + parameterIndex + "-" + x + "]");

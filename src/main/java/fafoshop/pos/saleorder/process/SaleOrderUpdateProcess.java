@@ -210,8 +210,9 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 		try {
 			String sql = "INSERT INTO sale_order_item "
 					+ "(sale_order_no, line_no, product_code, unit_price, quantity, line_amount, unit_cost, "
+					+ " unit_name, unit_qty, "
 					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 			insertPs = dba.prepareStatement(sql);
 			int lineNo = 1;
@@ -226,10 +227,12 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 				insertPs.setInt(5, item.quantity);
 				insertPs.setBigDecimal(6, lineAmount);
 				insertPs.setBigDecimal(7, unitCost);
-				insertPs.setString(8, userCode);
-				insertPs.setString(9, PRG_CD);
+				insertPs.setString(8, item.unitName);
+				insertPs.setNullableInt(9, item.unitQty);
 				insertPs.setString(10, userCode);
 				insertPs.setString(11, PRG_CD);
+				insertPs.setString(12, userCode);
+				insertPs.setString(13, PRG_CD);
 				insertPs.executeUpdate();
 			}
 		} finally {

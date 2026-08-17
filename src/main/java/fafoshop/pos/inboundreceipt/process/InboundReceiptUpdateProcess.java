@@ -67,7 +67,7 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 		for (InboundReceiptItemDto item : req.items) {
 			validateItemExists(dba, item.productCode);
 			expiryDates.add(parseDate(item.expiryDate, "ME000093"));
-			totalAmount = totalAmount.add(item.unitCost.multiply(BigDecimal.valueOf(item.quantity)));
+			totalAmount = totalAmount.add(effectiveLineAmount(item));
 		}
 		validateSupplierExists(dba, req.supplierCode);
 		validateNote(req.note);
@@ -125,7 +125,31 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 			if (item.price == null || item.price.signum() < 0) {
 				throwError("ME000067");
 			}
+			if (item.unitName != null && !item.unitName.trim().isEmpty()
+					&& (item.price == null || item.price.signum() <= 0)) {
+				throwError("ME000128");
+			}
+			validateLineAmount(item);
 		}
+	}
+
+	/** Giống hệt InboundReceiptCreateProcess.validateLineAmount()/effectiveLineAmount() — xem Javadoc ở đó. */
+	private void validateLineAmount(InboundReceiptItemDto item) throws ProcessCheckErrorException {
+		if (item.lineAmount == null) {
+			return;
+		}
+		if (item.lineAmount.signum() < 0) {
+			throwError("ME000127");
+		}
+		BigDecimal computed = item.unitCost.multiply(BigDecimal.valueOf(item.quantity));
+		BigDecimal maxDrift = BigDecimal.valueOf(item.quantity);
+		if (item.lineAmount.subtract(computed).abs().compareTo(maxDrift) > 0) {
+			throwError("ME000127");
+		}
+	}
+
+	private BigDecimal effectiveLineAmount(InboundReceiptItemDto item) {
+		return item.lineAmount != null ? item.lineAmount : item.unitCost.multiply(BigDecimal.valueOf(item.quantity));
 	}
 
 	private void validateItemExists(DBAccessor dba, String productCode) throws DBException, ProcessCheckErrorException {
@@ -268,9 +292,9 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 		try {
 			String sql = "INSERT INTO inbound_receipt_item "
 					+ "(branch_code, receipt_no, line_no, product_code, quality_code, expiry_date, "
-					+ " planned_qty, actual_qty, unit_cost, note, "
+					+ " planned_qty, actual_qty, unit_cost, unit_name, unit_qty, line_amount, price, note, "
 					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)";
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)";
 
 			insertPs = dba.prepareStatement(sql);
 			int lineNo = 1;
@@ -286,10 +310,14 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 				insertPs.setInt(7, item.quantity);
 				insertPs.setInt(8, item.quantity);
 				insertPs.setBigDecimal(9, item.unitCost);
-				insertPs.setString(10, userCode);
-				insertPs.setString(11, PRG_CD);
-				insertPs.setString(12, userCode);
-				insertPs.setString(13, PRG_CD);
+				insertPs.setString(10, item.unitName);
+				insertPs.setNullableInt(11, item.unitQty);
+				insertPs.setBigDecimal(12, effectiveLineAmount(item));
+				insertPs.setBigDecimal(13, item.price);
+				insertPs.setString(14, userCode);
+				insertPs.setString(15, PRG_CD);
+				insertPs.setString(16, userCode);
+				insertPs.setString(17, PRG_CD);
 				insertPs.executeUpdate();
 			}
 		} finally {

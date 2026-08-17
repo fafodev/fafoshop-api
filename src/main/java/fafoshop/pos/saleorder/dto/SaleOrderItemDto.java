@@ -27,4 +27,21 @@ public class SaleOrderItemDto {
 	 * (đa số dòng hàng quét/gõ tay bình thường).
 	 */
 	public BigDecimal lineAmount;
+
+	/**
+	 * Tên đơn vị đóng gói đã chọn lúc bán (vd "Lốc") — KHÔNG BẮT BUỘC, chỉ gửi
+	 * khi dòng hàng đến từ dialog "Chọn đơn vị" (xem
+	 * UnitChooserDialogComponent/docs/pos-da-don-vi-tinh.md). null/không gửi =
+	 * đơn vị lẻ (mặc định). CHỈ lưu lại để hiển thị đúng lựa chọn ban đầu của
+	 * người dùng (khắc phục khiếu nại "chọn Vỉ nhưng lưới chỉ hiện số đã quy
+	 * đổi ra lẻ") — KHÔNG dùng để tính toán, `quantity` vẫn LUÔN là số lượng
+	 * lẻ thật dùng cho tồn kho.
+	 */
+	public String unitName;
+
+	/**
+	 * Số lượng theo ĐÚNG đơn vị đã chọn (vd 3, nếu unitName="Lốc") — chỉ có ý
+	 * nghĩa khi `unitName` khác null, xem Javadoc `unitName`.
+	 */
+	public Integer unitQty;
 }

@@ -113,7 +113,8 @@ public class InboundReceiptDetailProcess extends AbstractProcess {
 		DBStatement ps = null;
 		try {
 			String sql = "SELECT iri.line_no, iri.product_code, p.name AS product_name, p.barcode, "
-					+ "iri.actual_qty, iri.unit_cost, iri.expiry_date "
+					+ "iri.actual_qty, iri.unit_cost, iri.unit_name, iri.unit_qty, iri.line_amount, iri.price, "
+					+ "iri.expiry_date "
 					+ "FROM inbound_receipt_item iri LEFT JOIN product p ON p.product_code = iri.product_code "
 					+ "WHERE iri.branch_code = ? AND iri.receipt_no = ? ORDER BY iri.line_no ASC";
 			ps = dba.prepareStatement(sql);
@@ -130,7 +131,16 @@ public class InboundReceiptDetailProcess extends AbstractProcess {
 				item.barcode = rs.getString("barcode");
 				item.quantity = rs.getInt("actual_qty");
 				item.unitCost = rs.getBigDecimal("unit_cost");
-				item.lineAmount = item.unitCost.multiply(BigDecimal.valueOf(item.quantity));
+				item.unitName = rs.getString("unit_name");
+				item.unitQty = rs.getObject("unit_qty", Integer.class);
+				item.price = rs.getBigDecimal("price");
+				// line_amount có thể NULL với dòng tạo TRƯỚC migration thêm cột này
+				// — tính lại như cũ (unitCost × quantity) cho dòng dữ liệu cũ đó,
+				// dòng MỚI (sau migration) LUÔN có sẵn giá trị chính xác đã lưu.
+				BigDecimal storedLineAmount = rs.getBigDecimal("line_amount");
+				item.lineAmount = storedLineAmount != null
+						? storedLineAmount
+						: item.unitCost.multiply(BigDecimal.valueOf(item.quantity));
 				Date expiryDate = rs.getDate("expiry_date");
 				item.expiryDate = expiryDate != null ? expiryDate.toLocalDate().format(DATE_FMT) : null;
 				res.items.add(item);

@@ -107,7 +107,7 @@ public class SaleOrderDetailProcess extends AbstractProcess {
 		DBStatement ps = null;
 		try {
 			String sql = "SELECT soi.line_no, soi.product_code, p.name AS product_name, p.barcode, "
-					+ "soi.unit_price, soi.quantity, soi.line_amount, soi.unit_cost "
+					+ "soi.unit_price, soi.quantity, soi.line_amount, soi.unit_cost, soi.unit_name, soi.unit_qty "
 					+ "FROM sale_order_item soi LEFT JOIN product p ON p.product_code = soi.product_code "
 					+ "WHERE soi.sale_order_no = ? ORDER BY soi.line_no ASC";
 			ps = dba.prepareStatement(sql);
@@ -127,6 +127,8 @@ public class SaleOrderDetailProcess extends AbstractProcess {
 				item.quantity = rs.getInt("quantity");
 				item.lineAmount = rs.getBigDecimal("line_amount");
 				item.unitCost = rs.getBigDecimal("unit_cost");
+				item.unitName = rs.getString("unit_name");
+				item.unitQty = rs.getObject("unit_qty", Integer.class);
 				if (item.unitCost != null) {
 					item.lineProfit = item.lineAmount.subtract(item.unitCost.multiply(BigDecimal.valueOf(item.quantity)));
 					profitAmount = profitAmount.add(item.lineProfit);
