@@ -55,6 +55,7 @@ public class ProductCreateProcess extends AbstractProcess {
 		ProductFieldValidator.validate(dba, req.name, req.price, req.barcode, null);
 		ProductCategoryValidator.validate(dba, req.categoryCode);
 		ProductSupplierValidator.validate(dba, req.suppliers);
+		ProductUnitValidator.validate(req.productUnits);
 		ProductFieldValidator.validateExpiryWarningDays(req.expiryWarningDays);
 
 		String productCode = SeqNoUtility.generate(dba, SEQ_PREFIX, req.accessInfo.userCode, PRG_CD);
@@ -87,6 +88,7 @@ public class ProductCreateProcess extends AbstractProcess {
 			ps.executeUpdate();
 
 			ProductSupplierWriter.insertAll(dba, productCode, req.suppliers, req.accessInfo.userCode, PRG_CD);
+			ProductUnitWriter.insertAll(dba, productCode, req.productUnits, req.accessInfo.userCode, PRG_CD);
 
 			res.productCode = productCode;
 			return res;

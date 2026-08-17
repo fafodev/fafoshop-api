@@ -24,4 +24,15 @@ public class ProductRowDto extends AbstractDto {
 
 	/** Định dạng "yyyy-MM-dd HH:mm:ss" — dùng String để tránh phải thêm module Jackson JSR-310 chỉ cho 1 field. */
 	public String updateDatetime;
+
+	/**
+	 * true nếu sản phẩm có cấu hình đơn vị đóng gói (product_unit, vd
+	 * Lốc/Thùng) — FE (POS/Nhập hàng) dùng field NÀY để quyết định có cần gọi
+	 * THÊM API pos/product/unit/list hay không lúc quét/chọn sản phẩm, tránh
+	 * round-trip thừa cho ĐA SỐ sản phẩm không dùng đa đơn vị (xem
+	 * docs/pos-da-don-vi-tinh.md). Kiểu `boolean` nguyên thuỷ (không phải
+	 * `Boolean`) — luôn có giá trị thật (EXISTS() không bao giờ NULL), không
+	 * thuộc diện field nullable phải lo undefined ở FE.
+	 */
+	public boolean hasUnits;
 }

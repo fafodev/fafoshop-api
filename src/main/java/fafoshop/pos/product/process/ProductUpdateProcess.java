@@ -51,6 +51,7 @@ public class ProductUpdateProcess extends AbstractProcess {
 		ProductFieldValidator.validate(dba, req.name, req.price, req.barcode, req.productCode);
 		ProductCategoryValidator.validate(dba, req.categoryCode);
 		ProductSupplierValidator.validate(dba, req.suppliers);
+		ProductUnitValidator.validate(req.productUnits);
 
 		DBStatement ps = null;
 		try {
@@ -85,6 +86,7 @@ public class ProductUpdateProcess extends AbstractProcess {
 			}
 
 			replaceSuppliers(dba, req);
+			replaceUnits(dba, req);
 
 			res.productCode = req.productCode;
 			return res;
@@ -115,5 +117,21 @@ public class ProductUpdateProcess extends AbstractProcess {
 		}
 
 		ProductSupplierWriter.insertAll(dba, req.productCode, req.suppliers, req.accessInfo.userCode, PRG_CD);
+	}
+
+	/** Chiến lược "thay hết" — mirror replaceSuppliers(), xem docs/pos-da-don-vi-tinh.md. */
+	private void replaceUnits(DBAccessor dba, ProductUpdateRequest req) throws DBException {
+		DBStatement deletePs = null;
+		try {
+			deletePs = dba.prepareStatement("DELETE FROM product_unit WHERE product_code = ?");
+			deletePs.setString(1, req.productCode);
+			deletePs.executeUpdate();
+		} finally {
+			if (deletePs != null) {
+				deletePs.close();
+			}
+		}
+
+		ProductUnitWriter.insertAll(dba, req.productCode, req.productUnits, req.accessInfo.userCode, PRG_CD);
 	}
 }

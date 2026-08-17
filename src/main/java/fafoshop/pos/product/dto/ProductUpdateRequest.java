@@ -18,4 +18,6 @@ public class ProductUpdateRequest extends AbstractRequest {
 	public Integer minStockQty;
 	/** Danh sách NCC gắn với sản phẩm — client gửi TOÀN BỘ danh sách mong muốn, ProductUpdateProcess thay hết dòng cũ. */
 	public List<ProductSupplierDto> suppliers;
+	/** Đơn vị đóng gói lớn hơn đơn vị lẻ — client gửi TOÀN BỘ danh sách mong muốn, thay hết dòng cũ (giống suppliers). */
+	public List<ProductUnitDto> productUnits;
 }

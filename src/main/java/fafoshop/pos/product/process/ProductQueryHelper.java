@@ -32,7 +32,8 @@ final class ProductQueryHelper {
 			+ " JOIN supplier s2 ON s2.supplier_code = ps2.supplier_code "
 			+ " WHERE ps2.product_code = p.product_code) AS supplier_names, "
 			+ "p.unit_name, p.reduced_tax_rate_flg, p.price, p.min_stock_qty, p.expiry_warning_days, "
-			+ "p.del_flg, p.update_datetime ";
+			+ "p.del_flg, p.update_datetime, "
+			+ "EXISTS(SELECT 1 FROM product_unit pu2 WHERE pu2.product_code = p.product_code) AS has_units ";
 
 	static final String FROM_JOIN_SQL = "FROM product p "
 			+ "LEFT JOIN category c ON c.category_code = p.category_code ";
@@ -125,6 +126,7 @@ final class ProductQueryHelper {
 		row.delFlg = rs.getString("del_flg");
 		Timestamp updateDatetime = rs.getTimestamp("update_datetime");
 		row.updateDatetime = updateDatetime != null ? updateDatetime.toLocalDateTime().format(DATETIME_FMT) : null;
+		row.hasUnits = rs.getBoolean("has_units");
 		return row;
 	}
 }

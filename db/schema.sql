@@ -135,6 +135,31 @@ CREATE TABLE product_supplier (
 );
 
 -- ----------------------------------------------------------------------------
+-- product_unit — các cấp đóng gói LỚN HƠN đơn vị nhỏ nhất của 1 sản phẩm
+-- (vd "Lốc" = 4, "Thùng" = 48...), xem docs/pos-da-don-vi-tinh.md (gốc
+-- workspace). Đơn vị NHỎ NHẤT (lẻ) KHÔNG có dòng riêng ở đây — đó chính là
+-- product.unit_name/product.price hiện có. Bảng này CHỈ dùng để QUY ĐỔI lúc
+-- nhập/bán (số lượng × conversion_qty ra đúng số lẻ thật) — KHÔNG có kho
+-- riêng, KHÔNG có lịch sử nhập riêng cho từng cấp đóng gói, TẤT CẢ giao
+-- dịch (stock/inbound_receipt_item/sale_order_item) vẫn LUÔN lưu theo đơn
+-- vị lẻ như trước giờ, không đổi gì.
+-- ----------------------------------------------------------------------------
+CREATE TABLE product_unit (
+  product_code      VARCHAR(100)  NOT NULL COMMENT 'Mã sản phẩm (1 phần khoá chính)',
+  unit_name         VARCHAR(20)   NOT NULL COMMENT 'Tên đơn vị đóng gói (Lốc, Thùng...) - 1 phần khoá chính',
+  conversion_qty    INT(9)        NOT NULL COMMENT 'Số lượng đơn vị NHỎ NHẤT (lẻ) quy đổi ra 1 đơn vị này, vd Lốc=4',
+  unit_price        DECIMAL(12,2) NOT NULL COMMENT 'Giá bán khi bán theo đơn vị này - nhập tay riêng, KHÔNG ép theo tỉ lệ product.price*conversion_qty (thường có chiết khấu mua sỉ)',
+  entry_user_code   VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
+  entry_datetime    TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
+  entry_program     VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình tạo bản ghi',
+  update_user_code  VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng cập nhật gần nhất',
+  update_datetime   TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm cập nhật gần nhất',
+  update_program    VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
+  PRIMARY KEY (product_code, unit_name),
+  CONSTRAINT fk_productunit_product FOREIGN KEY (product_code) REFERENCES product (product_code)
+);
+
+-- ----------------------------------------------------------------------------
 -- branch
 -- ----------------------------------------------------------------------------
 CREATE TABLE branch (

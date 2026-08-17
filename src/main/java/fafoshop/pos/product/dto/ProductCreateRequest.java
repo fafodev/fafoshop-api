@@ -19,4 +19,6 @@ public class ProductCreateRequest extends AbstractRequest {
 	public Integer expiryWarningDays;
 	/** Danh sách NCC gắn với sản phẩm — sản phẩm có thể có NHIỀU NCC (xem bảng product_supplier). */
 	public List<ProductSupplierDto> suppliers;
+	/** Đơn vị đóng gói lớn hơn đơn vị lẻ (Lốc, Thùng...) — xem docs/pos-da-don-vi-tinh.md, bảng product_unit. */
+	public List<ProductUnitDto> productUnits;
 }
