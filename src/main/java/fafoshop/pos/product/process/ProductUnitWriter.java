@@ -27,9 +27,9 @@ final class ProductUnitWriter {
 		DBStatement ps = null;
 		try {
 			String sql = "INSERT INTO product_unit "
-					+ "(product_code, unit_name, conversion_qty, unit_price, "
+					+ "(product_code, unit_name, conversion_qty, unit_price, unit_cost, "
 					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 			ps = dba.prepareStatement(sql);
 			for (ProductUnitDto item : units) {
@@ -37,10 +37,12 @@ final class ProductUnitWriter {
 				ps.setString(2, item.unitName);
 				ps.setInt(3, item.conversionQty);
 				ps.setBigDecimal(4, item.unitPrice);
-				ps.setString(5, userCode);
-				ps.setString(6, programCode);
-				ps.setString(7, userCode);
-				ps.setString(8, programCode);
+				// setBigDecimal(idx, null) = SQL NULL — unitCost KHÔNG bắt buộc.
+				ps.setBigDecimal(5, item.unitCost);
+				ps.setString(6, userCode);
+				ps.setString(7, programCode);
+				ps.setString(8, userCode);
+				ps.setString(9, programCode);
 				ps.executeUpdate();
 			}
 		} finally {

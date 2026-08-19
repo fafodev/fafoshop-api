@@ -41,20 +41,27 @@ thu chi tiết; quản lý khách hàng/khuyến mãi/chi nhánh.
 
 ## Giá vốn & tiền lãi — ĐÃ CHỐT (không còn UNKNOWN)
 
-Trước đây "giá vốn tồn kho" là UNKNOWN. Người dùng đã CHỐT công thức khi
-yêu cầu thêm cột "tiền lãi" ở màn tra cứu bán hàng:
+**CẬP NHẬT 2026-08-19 (xem `../../docs/pos-dong-bo-gia.md` — quyết định MỚI
+NHẤT, đọc trước khi đụng vào giá vốn)**: giá vốn KHÔNG còn tính bình quân
+gia quyền từ `inbound_receipt_item` nữa — giờ CẤU HÌNH TRỰC TIẾP trong
+Product Master (`product.cost` cho đơn vị lẻ, `product_unit.unit_cost` cho
+từng đơn vị đóng gói, MỖI đơn vị 1 giá riêng), Nhập hàng đổi giá thì HỎI XÁC
+NHẬN rồi mới ghi đè (`SaleOrderCreateProcess.resolveUnitCost`, KHÔNG còn
+`queryWeightedAvgUnitCost`). Phần "chụp lại NGAY LÚC TẠO ĐƠN BÁN vào
+`sale_order_item.unit_cost`, không tính lại khi xem báo cáo sau" VẪN GIỮ
+NGUYÊN (chỉ đổi NGUỒN đọc giá vốn tại thời điểm bán, không đổi cơ chế
+snapshot) — các gạch đầu dòng dưới đây (NULL khi chưa xác định, tiền lãi
+NULL nếu thiếu 1 dòng, chưa làm "Tổng giá trị tồn kho") vẫn còn đúng
+nguyên văn:
 
-- **Giá vốn = bình quân gia quyền TẤT CẢ phiếu nhập của sản phẩm tính đến
-  hiện tại** (`SUM(actual_qty*unit_cost)/SUM(actual_qty)` trên
-  `inbound_receipt_item`, lọc theo `branch_code`) — KHÔNG phải FIFO.
 - **CHỤP LẠI (snapshot) NGAY LÚC TẠO ĐƠN BÁN**, lưu vào
   `sale_order_item.unit_cost` (xem
-  `SaleOrderCreateProcess.queryWeightedAvgUnitCost`) — giống cách
+  `SaleOrderCreateProcess.resolveUnitCost`) — giống cách
   `unit_price` được chụp lại, KHÔNG tính lại giá vốn khi xem báo cáo sau
-  này (giá nhập mới hơn KHÔNG làm thay đổi lãi của đơn đã bán trong quá
-  khứ).
-- `unit_cost` NULL (KHÔNG phải 0) nếu sản phẩm CHƯA TỪNG có phiếu nhập tính
-  đến lúc bán. Đơn bán tạo TRƯỚC migration
+  này (đổi giá vốn trong Product Master sau đó KHÔNG làm thay đổi lãi của
+  đơn đã bán trong quá khứ).
+- `unit_cost` NULL (KHÔNG phải 0) nếu `product.cost`/`product_unit.unit_cost`
+  CHƯA từng được cấu hình tính đến lúc bán. Đơn bán tạo TRƯỚC migration
   `db/migration_add_sale_order_item_unit_cost.sql` cũng NULL — KHÔNG
   backfill tự động (không có cơ sở tính đúng giá vốn tại đúng thời điểm đã
   bán trong quá khứ).
@@ -64,7 +71,9 @@ yêu cầu thêm cột "tiền lãi" ở màn tra cứu bán hàng:
 - Vẫn CHƯA làm "Tổng giá trị tồn kho" (giá vốn × tồn kho hiện tại) — khác
   mục đích với "lãi từng đơn bán", chưa có yêu cầu cụ thể.
 
-Chi tiết đầy đủ: `../../docs/pos-tra-cuu-ban-hang.md` mục giá vốn/lãi.
+Chi tiết đầy đủ: `../../docs/pos-dong-bo-gia.md` (kiến trúc giá vốn MỚI) và
+`../../docs/pos-tra-cuu-ban-hang.md` mục giá vốn/lãi (công thức tính lãi,
+không đổi).
 
 ## UNKNOWN — không được tự phát minh
 

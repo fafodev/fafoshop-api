@@ -21,4 +21,11 @@ public class ProductUnitDto extends AbstractDto {
 
 	/** Giá bán khi bán theo đơn vị này — nhập tay riêng, KHÔNG ép theo tỉ lệ. */
 	public BigDecimal unitPrice;
+
+	/**
+	 * Giá vốn khi nhập theo đơn vị này — nhập tay riêng, KHÔNG ép theo tỉ lệ
+	 * conversionQty (thường có chiết khấu mua sỉ, giống unitPrice). NULL =
+	 * chưa cấu hình (xem docs/pos-dong-bo-gia.md).
+	 */
+	public BigDecimal unitCost;
 }

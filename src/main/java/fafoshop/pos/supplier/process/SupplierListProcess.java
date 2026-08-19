@@ -14,7 +14,6 @@ import fafoshop.common.exception.DBException;
 import fafoshop.common.exception.FatalException;
 import fafoshop.common.exception.ProcessCheckErrorException;
 import fafoshop.common.process.AbstractProcess;
-import fafoshop.pos.supplier.dto.SupplierListRequest;
 import fafoshop.pos.supplier.dto.SupplierListResponse;
 import fafoshop.pos.supplier.dto.SupplierListRowDto;
 

@@ -242,7 +242,7 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 			int lineNo = 1;
 			for (SaleOrderItemDto item : items) {
 				BigDecimal lineAmount = effectiveLineAmount(item);
-				BigDecimal unitCost = queryWeightedAvgUnitCost(dba, branchCode, item.productCode);
+				BigDecimal unitCost = resolveUnitCost(dba, item.productCode, item.unitName);
 
 				ps.setString(1, saleOrderNo);
 				ps.setInt(2, lineNo++);
@@ -273,39 +273,70 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 	}
 
 	/**
-	 * Giá vốn BÌNH QUÂN GIA QUYỀN của sản phẩm tại chi nhánh, tính từ TẤT CẢ
-	 * phiếu nhập tính đến hiện tại (SUM(actual_qty*unit_cost)/SUM(actual_qty)
-	 * trên inbound_receipt_item) — chụp lại NGAY LÚC bán vào
-	 * sale_order_item.unit_cost, KHÔNG tính lại khi xem báo cáo sau này (khác
-	 * cách unit_price được lưu, cùng tinh thần "chụp giá tại thời điểm giao
-	 * dịch"). Quyết định công thức này đã CHỐT theo yêu cầu người dùng — xem
-	 * docs/pos-tra-cuu-ban-hang.md (gốc workspace) và retail-domain.md.
+	 * Giá vốn CẤU HÌNH TRONG PRODUCT MASTER tại THỜI ĐIỂM bán — chụp lại
+	 * (snapshot) ngay lúc bán vào sale_order_item.unit_cost, KHÔNG tính lại
+	 * khi xem báo cáo sau này (cùng tinh thần "chụp giá tại thời điểm giao
+	 * dịch" như unit_price). THAY THẾ HẲN cách tính bình quân gia quyền từ
+	 * inbound_receipt_item cũ — giá vốn giờ do người dùng cấu hình trực tiếp
+	 * trong Product Master (sửa tay hoặc Nhập hàng đổi giá thì hỏi xác nhận
+	 * rồi ghi đè), xem docs/pos-dong-bo-gia.md.
 	 *
-	 * Trả về NULL nếu sản phẩm CHƯA TỪNG có phiếu nhập nào (KHÔNG trả 0 —
-	 * tránh hiểu nhầm "giá vốn bằng 0" khiến lãi bị tính SAI thành bằng đúng
-	 * doanh thu).
+	 * `unitName` null → đọc product.cost (đơn vị lẻ). `unitName` khác null →
+	 * đọc product_unit.unit_cost của ĐÚNG đơn vị đã chọn (giá vốn theo đơn vị
+	 * đó, vd 1 Vỉ), quy đổi về per-lẻ bằng cách chia conversion_qty — GIỐNG
+	 * cách unit_price được quy đổi ở UnitChooserDialogComponent phía frontend
+	 * (xem Javadoc UnitChooserResult.unitPrice), để cột unit_cost lưu xuống
+	 * LUÔN nhất quán ý nghĩa "theo đơn vị lẻ" bất kể sản phẩm có/không có đơn
+	 * vị đóng gói.
+	 *
+	 * Trả về NULL nếu CHƯA cấu hình giá vốn (product.cost/product_unit.unit_cost
+	 * NULL) — KHÔNG trả 0, tránh hiểu nhầm "giá vốn bằng 0" khiến lãi bị tính
+	 * SAI thành bằng đúng doanh thu.
 	 */
-	private BigDecimal queryWeightedAvgUnitCost(DBAccessor dba, String branchCode, String productCode)
-			throws DBException {
+	private BigDecimal resolveUnitCost(DBAccessor dba, String productCode, String unitName) throws DBException {
+		if (unitName == null || unitName.trim().isEmpty()) {
+			return queryProductCost(dba, productCode);
+		}
+
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
-			String sql = "SELECT SUM(actual_qty * unit_cost) AS total_cost, SUM(actual_qty) AS total_qty "
-					+ "FROM inbound_receipt_item WHERE branch_code = ? AND product_code = ? AND actual_qty > 0";
+			String sql = "SELECT unit_cost, conversion_qty FROM product_unit WHERE product_code = ? AND unit_name = ?";
 			ps = dba.prepareStatement(sql);
-			ps.setString(1, branchCode);
-			ps.setString(2, productCode);
+			ps.setString(1, productCode);
+			ps.setString(2, unitName);
 			rs = ps.executeQuery();
 
 			if (!rs.next()) {
+				// đơn vị đã chọn KHÔNG còn tồn tại trong product_unit (vd bị xoá
+				// khỏi Product Master sau khi đơn/dòng hàng đã dùng nó) — không
+				// còn cơ sở suy ra giá vốn, coi như chưa xác định (KHÔNG throw
+				// lỗi chặn bán hàng vì đây là dữ liệu THAM KHẢO cho lãi, không
+				// phải điều kiện bắt buộc để bán được).
 				return null;
 			}
-			BigDecimal totalCost = rs.getBigDecimal("total_cost");
-			BigDecimal totalQty = rs.getBigDecimal("total_qty");
-			if (totalCost == null || totalQty == null || totalQty.signum() <= 0) {
+			BigDecimal unitCost = rs.getBigDecimal("unit_cost");
+			int conversionQty = rs.getInt("conversion_qty");
+			if (unitCost == null || conversionQty <= 0) {
 				return null;
 			}
-			return totalCost.divide(totalQty, 2, RoundingMode.HALF_UP);
+			return unitCost.divide(BigDecimal.valueOf(conversionQty), 2, RoundingMode.HALF_UP);
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			closeQuietly(rs, ps);
+		}
+	}
+
+	private BigDecimal queryProductCost(DBAccessor dba, String productCode) throws DBException {
+		ResultSet rs = null;
+		DBStatement ps = null;
+		try {
+			String sql = "SELECT cost FROM product WHERE product_code = ?";
+			ps = dba.prepareStatement(sql);
+			ps.setString(1, productCode);
+			rs = ps.executeQuery();
+			return rs.next() ? rs.getBigDecimal("cost") : null;
 		} catch (SQLException e) {
 			throw new DBException(e);
 		} finally {

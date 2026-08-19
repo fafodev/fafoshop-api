@@ -86,6 +86,8 @@ public class InboundReceiptCreateProcess extends AbstractProcess {
 		insertReceiptItems(dba, receiptNo, branchCode, req.items, expiryDates, req.accessInfo.userCode);
 		upsertStock(dba, branchCode, req.items, expiryDates, req.accessInfo.userCode);
 		updateProductPrices(dba, req.items, req.accessInfo.userCode);
+		InboundReceiptCostWriter.updateMasterCosts(dba, req.items, req.accessInfo.userCode, PRG_CD);
+		InboundReceiptCostWriter.updateMasterPrices(dba, req.items, req.accessInfo.userCode, PRG_CD);
 
 		res.receiptNo = receiptNo;
 		res.totalAmount = totalAmount;
@@ -119,6 +121,36 @@ public class InboundReceiptCreateProcess extends AbstractProcess {
 				throwError("ME000128");
 			}
 			validateLineAmount(item);
+			validateMasterCost(item);
+			validateMasterPrice(item);
+		}
+	}
+
+	/**
+	 * Dòng ĐÃ XÁC NHẬN ghi đè giá vốn Master (updateMasterCost=true) bắt buộc
+	 * masterUnitCost &gt; 0 — chặn ở tầng server phòng client bỏ qua kiểm tra
+	 * phía FE (xem docs/pos-dong-bo-gia.md, mirror validateItems ở trên chặn
+	 * price=0 khi unitName khác null).
+	 */
+	private void validateMasterCost(InboundReceiptItemDto item) throws ProcessCheckErrorException {
+		if (!Boolean.TRUE.equals(item.updateMasterCost)) {
+			return;
+		}
+		if (item.masterUnitCost == null || item.masterUnitCost.signum() <= 0) {
+			throwError("ME000131");
+		}
+	}
+
+	/**
+	 * Dòng ĐÃ XÁC NHẬN ghi đè giá bán Master (updateMasterPrice=true) bắt
+	 * buộc masterUnitPrice &gt; 0 — mirror validateMasterCost().
+	 */
+	private void validateMasterPrice(InboundReceiptItemDto item) throws ProcessCheckErrorException {
+		if (!Boolean.TRUE.equals(item.updateMasterPrice)) {
+			return;
+		}
+		if (item.masterUnitPrice == null || item.masterUnitPrice.signum() <= 0) {
+			throwError("ME000132");
 		}
 	}
 
@@ -398,6 +430,14 @@ public class InboundReceiptCreateProcess extends AbstractProcess {
 	 * cho phép sửa giá bán ngay lúc nhập hàng thay vì phải mở riêng màn Sản
 	 * phẩm (xem trao đổi thiết kế). Ghi lại KỂ CẢ khi giá không đổi (đơn giản,
 	 * an toàn - ghi đè bằng đúng giá đang hiển thị không gây sai lệch).
+	 *
+	 * CHỈ áp dụng cho dòng ĐƠN VỊ LẺ (unitName null) — BUG ĐÃ SỬA: trước đây
+	 * ghi `item.price` vào `product.price` cho MỌI dòng bất kể đơn vị, khiến
+	 * dòng chọn đơn vị đóng gói (giá bán/1 Vỉ) ghi ĐÈ SAI lên giá bán đơn vị
+	 * lẻ. Dòng đơn vị đóng gói giờ đồng bộ giá vào `product_unit.unit_price`
+	 * qua {@link InboundReceiptCostWriter#updateMasterPrices} thay vào đó
+	 * (CÓ xác nhận, khác nhánh lẻ ở đây KHÔNG cần xác nhận) — xem
+	 * docs/pos-dong-bo-gia.md.
 	 */
 	private void updateProductPrices(DBAccessor dba, List<InboundReceiptItemDto> items, String userCode)
 			throws DBException {
@@ -409,6 +449,9 @@ public class InboundReceiptCreateProcess extends AbstractProcess {
 
 			ps = dba.prepareStatement(sql);
 			for (InboundReceiptItemDto item : items) {
+				if (item.unitName != null && !item.unitName.trim().isEmpty()) {
+					continue;
+				}
 				ps.setBigDecimal(1, item.price);
 				ps.setString(2, userCode);
 				ps.setString(3, PRG_CD);

@@ -218,7 +218,7 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 			int lineNo = 1;
 			for (SaleOrderItemDto item : items) {
 				BigDecimal lineAmount = effectiveLineAmount(item);
-				BigDecimal unitCost = queryWeightedAvgUnitCost(dba, branchCode, item.productCode);
+				BigDecimal unitCost = resolveUnitCost(dba, item.productCode, item.unitName);
 
 				insertPs.setString(1, saleOrderNo);
 				insertPs.setInt(2, lineNo++);
@@ -242,28 +242,46 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 		}
 	}
 
-	/** Giống hệt SaleOrderCreateProcess.queryWeightedAvgUnitCost() — xem Javadoc ở đó cho công thức đầy đủ đã chốt. */
-	private BigDecimal queryWeightedAvgUnitCost(DBAccessor dba, String branchCode, String productCode)
-			throws DBException {
+	/** Giống hệt SaleOrderCreateProcess.resolveUnitCost() — xem Javadoc ở đó cho công thức đầy đủ (đọc giá vốn từ Product Master, docs/pos-dong-bo-gia.md). */
+	private BigDecimal resolveUnitCost(DBAccessor dba, String productCode, String unitName) throws DBException {
+		if (unitName == null || unitName.trim().isEmpty()) {
+			return queryProductCost(dba, productCode);
+		}
+
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
-			String sql = "SELECT SUM(actual_qty * unit_cost) AS total_cost, SUM(actual_qty) AS total_qty "
-					+ "FROM inbound_receipt_item WHERE branch_code = ? AND product_code = ? AND actual_qty > 0";
+			String sql = "SELECT unit_cost, conversion_qty FROM product_unit WHERE product_code = ? AND unit_name = ?";
 			ps = dba.prepareStatement(sql);
-			ps.setString(1, branchCode);
-			ps.setString(2, productCode);
+			ps.setString(1, productCode);
+			ps.setString(2, unitName);
 			rs = ps.executeQuery();
 
 			if (!rs.next()) {
 				return null;
 			}
-			BigDecimal totalCost = rs.getBigDecimal("total_cost");
-			BigDecimal totalQty = rs.getBigDecimal("total_qty");
-			if (totalCost == null || totalQty == null || totalQty.signum() <= 0) {
+			BigDecimal unitCost = rs.getBigDecimal("unit_cost");
+			int conversionQty = rs.getInt("conversion_qty");
+			if (unitCost == null || conversionQty <= 0) {
 				return null;
 			}
-			return totalCost.divide(totalQty, 2, RoundingMode.HALF_UP);
+			return unitCost.divide(BigDecimal.valueOf(conversionQty), 2, RoundingMode.HALF_UP);
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			closeQuietly(rs, ps);
+		}
+	}
+
+	private BigDecimal queryProductCost(DBAccessor dba, String productCode) throws DBException {
+		ResultSet rs = null;
+		DBStatement ps = null;
+		try {
+			String sql = "SELECT cost FROM product WHERE product_code = ?";
+			ps = dba.prepareStatement(sql);
+			ps.setString(1, productCode);
+			rs = ps.executeQuery();
+			return rs.next() ? rs.getBigDecimal("cost") : null;
 		} catch (SQLException e) {
 			throw new DBException(e);
 		} finally {

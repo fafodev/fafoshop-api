@@ -45,6 +45,11 @@ final class ProductUnitValidator {
 			if (item.unitPrice == null || item.unitPrice.signum() < 0) {
 				throwError("ME000124");
 			}
+			// unitCost KHÔNG bắt buộc (null = chưa cấu hình giá vốn cho đơn vị
+			// này) — chỉ chặn giá trị âm, xem docs/pos-dong-bo-gia.md.
+			if (item.unitCost != null && item.unitCost.signum() < 0) {
+				throwError("ME000130");
+			}
 		}
 	}
 

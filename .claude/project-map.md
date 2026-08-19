@@ -12,7 +12,9 @@
   `../../docs/pos-tong-quan-dashboard.md`. `product` có thêm action
   `unit/list` + field `productUnits` trong create/update (bảng con
   `product_unit` — đơn vị đóng gói Lốc/Thùng, xem
-  `../../docs/pos-da-don-vi-tinh.md`). `saleorder`/`inboundreceipt` có
+  `../../docs/pos-da-don-vi-tinh.md`). `product`/`product_unit` có thêm cột
+  `cost`/`unit_cost` (giá vốn cấu hình trực tiếp, thay bình quân gia quyền
+  — xem `../../docs/pos-dong-bo-gia.md`). `saleorder`/`inboundreceipt` có
   thêm action `update`/`void` (sửa/huỷ đơn bán/phiếu nhập đã tạo — xem
   `../../docs/pos-sua-huy-don.md`), `inboundreceipt` có thêm
   `search`/`detail` (trước đây CHỈ có `create`).

@@ -19,13 +19,17 @@ public class InboundReceiptItemDto {
 	public BigDecimal unitCost;
 
 	/**
-	 * Giá bán hiện hành của sản phẩm - hiển thị/sửa ngay trên lưới màn Nhập
-	 * hàng (thay vì phải qua màn Sản phẩm sửa riêng). Process ghi đè thẳng vào
-	 * product.price bất kể có thay đổi hay không (ghi lại giá trị đang hiển thị
-	 * trên lưới là an toàn - không đổi thì ghi lại đúng giá cũ), ĐỒNG THỜI lưu
-	 * lại nguyên giá trị này vào inbound_receipt_item.price để xem lại đúng ở
-	 * Chi tiết phiếu nhập (trước đây chỉ là side-effect thoáng qua, không lưu
-	 * lại — khắc phục khiếu nại "phiếu nhập không hiện giá bán").
+	 * Giá bán theo ĐÚNG đơn vị của dòng này — đơn vị LẺ nếu `unitName` null
+	 * (Process ghi đè THẲNG vào `product.price` KHÔNG cần xác nhận, hành vi
+	 * CŨ giữ nguyên), hoặc giá bán theo đơn vị đóng gói (vd giá bán/1 Vỉ) nếu
+	 * `unitName` khác null (Process KHÔNG đụng `product.price` nữa — BUG ĐÃ
+	 * SỬA: trước đây field này LUÔN hiểu là per-lẻ dù dòng đang ở đơn vị nào,
+	 * khiến chọn "Vỉ" gõ giá bán/Vỉ vào đây ghi đè SAI `product.price` thành
+	 * giá của cả Vỉ — xem docs/pos-dong-bo-gia.md mục "Nhập hàng ghi sai
+	 * product.price". Đồng bộ vào `product_unit.unit_price` (nếu có xác
+	 * nhận) thay vào đó — xem {@link #updateMasterPrice}/{@link #masterUnitPrice}).
+	 * LUÔN lưu lại nguyên giá trị này vào `inbound_receipt_item.price` để xem
+	 * lại đúng ở Chi tiết phiếu nhập, bất kể có ghi vào Master hay không.
 	 */
 	public BigDecimal price;
 
@@ -60,4 +64,39 @@ public class InboundReceiptItemDto {
 	 * đồng. null/không gửi → server tự tính `unitCost × quantity` như cũ.
 	 */
 	public BigDecimal lineAmount;
+
+	/**
+	 * true = người dùng ĐÃ XÁC NHẬN (qua hộp thoại xác nhận phía FE) ghi đè
+	 * giá vốn cấu hình trong Product Master bằng đúng {@link #masterUnitCost}
+	 * — xem docs/pos-dong-bo-gia.md. null/false = KHÔNG đổi gì trên Master,
+	 * `unitCost` trên dòng này CHỈ là bản ghi lịch sử của phiếu.
+	 */
+	public Boolean updateMasterCost;
+
+	/**
+	 * Giá vốn theo ĐÚNG đơn vị của dòng này — đơn vị LẺ nếu `unitName` null
+	 * (bằng đúng `unitCost`), hoặc giá vốn theo đơn vị đóng gói (vd giá vốn/1
+	 * Vỉ) nếu `unitName` khác null (KHÁC `unitCost` vốn luôn quy đổi về lẻ).
+	 * CHỈ dùng khi `updateMasterCost = true`, ghi thẳng vào
+	 * `product.cost`/`product_unit.unit_cost` tương ứng — null nếu
+	 * `updateMasterCost` không true.
+	 */
+	public BigDecimal masterUnitCost;
+
+	/**
+	 * true = người dùng ĐÃ XÁC NHẬN ghi đè giá bán cấu hình trong
+	 * `product_unit.unit_price` bằng đúng {@link #masterUnitPrice} — CHỈ có ý
+	 * nghĩa khi `unitName` khác null (dòng đơn vị lẻ luôn ghi thẳng
+	 * `product.price`, không cần xác nhận, xem Javadoc {@link #price}). Xem
+	 * docs/pos-dong-bo-gia.md.
+	 */
+	public Boolean updateMasterPrice;
+
+	/**
+	 * Giá bán theo đơn vị đóng gói của dòng này (bằng đúng {@link #price} khi
+	 * `unitName` khác null) — CHỈ dùng khi `updateMasterPrice = true`, ghi
+	 * thẳng vào `product_unit.unit_price` — null nếu `updateMasterPrice`
+	 * không true hoặc dòng ở đơn vị lẻ.
+	 */
+	public BigDecimal masterUnitPrice;
 }

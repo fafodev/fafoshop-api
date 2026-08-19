@@ -31,17 +31,9 @@ final class ProductQueryHelper {
 			+ "(SELECT GROUP_CONCAT(s2.name ORDER BY s2.name SEPARATOR ', ') FROM product_supplier ps2 "
 			+ " JOIN supplier s2 ON s2.supplier_code = ps2.supplier_code "
 			+ " WHERE ps2.product_code = p.product_code) AS supplier_names, "
-			+ "p.unit_name, p.reduced_tax_rate_flg, p.price, p.min_stock_qty, p.expiry_warning_days, "
+			+ "p.unit_name, p.reduced_tax_rate_flg, p.price, p.cost, p.min_stock_qty, p.expiry_warning_days, "
 			+ "p.del_flg, p.update_datetime, "
-			+ "EXISTS(SELECT 1 FROM product_unit pu2 WHERE pu2.product_code = p.product_code) AS has_units, "
-			// Giá vốn bình quân gia quyền hiện tại — tính CHUNG mọi chi nhánh
-			// (xem Javadoc ProductRowDto.currentAvgCost), CHỈ dùng làm cảnh báo
-			// tham khảo, KHÔNG phải số liệu tài chính chính thức. NULL nếu chưa
-			// từng có phiếu nhập nào (SUM(actual_qty)=0 hoặc không có dòng nào).
-			+ "(SELECT CASE WHEN SUM(iri2.actual_qty) > 0 "
-			+ " THEN SUM(iri2.actual_qty * iri2.unit_cost) / SUM(iri2.actual_qty) ELSE NULL END "
-			+ " FROM inbound_receipt_item iri2 WHERE iri2.product_code = p.product_code AND iri2.actual_qty > 0) "
-			+ " AS current_avg_cost ";
+			+ "EXISTS(SELECT 1 FROM product_unit pu2 WHERE pu2.product_code = p.product_code) AS has_units ";
 
 	static final String FROM_JOIN_SQL = "FROM product p "
 			+ "LEFT JOIN category c ON c.category_code = p.category_code ";
@@ -129,13 +121,13 @@ final class ProductQueryHelper {
 		row.unitName = rs.getString("unit_name");
 		row.reducedTaxRateFlg = rs.getString("reduced_tax_rate_flg");
 		row.price = rs.getBigDecimal("price");
+		row.cost = rs.getBigDecimal("cost");
 		row.minStockQty = rs.getInt("min_stock_qty");
 		row.expiryWarningDays = rs.getInt("expiry_warning_days");
 		row.delFlg = rs.getString("del_flg");
 		Timestamp updateDatetime = rs.getTimestamp("update_datetime");
 		row.updateDatetime = updateDatetime != null ? updateDatetime.toLocalDateTime().format(DATETIME_FMT) : null;
 		row.hasUnits = rs.getBoolean("has_units");
-		row.currentAvgCost = rs.getBigDecimal("current_avg_cost");
 		return row;
 	}
 }

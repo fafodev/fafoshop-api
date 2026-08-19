@@ -51,7 +51,7 @@ public class ProductUnitListProcess extends AbstractProcess {
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
-			String sql = "SELECT unit_name, conversion_qty, unit_price FROM product_unit "
+			String sql = "SELECT unit_name, conversion_qty, unit_price, unit_cost FROM product_unit "
 					+ "WHERE product_code = ? ORDER BY conversion_qty ASC";
 
 			ps = dba.prepareStatement(sql);
@@ -64,6 +64,7 @@ public class ProductUnitListProcess extends AbstractProcess {
 				row.unitName = rs.getString("unit_name");
 				row.conversionQty = rs.getInt("conversion_qty");
 				row.unitPrice = rs.getBigDecimal("unit_price");
+				row.unitCost = rs.getBigDecimal("unit_cost");
 				rows.add(row);
 			}
 			res.rows = rows;

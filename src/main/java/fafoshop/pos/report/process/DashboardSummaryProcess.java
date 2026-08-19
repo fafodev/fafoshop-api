@@ -44,8 +44,6 @@ import fafoshop.pos.report.dto.TopProductDto;
  */
 public class DashboardSummaryProcess extends AbstractProcess {
 
-	private static final String PRG_CD = "RPT_DASH";
-
 	private static final int DEFAULT_RANGE_DAYS = 7;
 
 	public DashboardSummaryProcess(ILogSender logSender) {

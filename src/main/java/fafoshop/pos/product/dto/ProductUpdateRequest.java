@@ -15,6 +15,8 @@ public class ProductUpdateRequest extends AbstractRequest {
 	public String unitName;
 	public String reducedTaxRateFlg;
 	public BigDecimal price;
+	/** Giá vốn hiện hành đơn vị lẻ — KHÔNG bắt buộc, xem docs/pos-dong-bo-gia.md. */
+	public BigDecimal cost;
 	public Integer minStockQty;
 	/** Danh sách NCC gắn với sản phẩm — client gửi TOÀN BỘ danh sách mong muốn, ProductUpdateProcess thay hết dòng cũ. */
 	public List<ProductSupplierDto> suppliers;

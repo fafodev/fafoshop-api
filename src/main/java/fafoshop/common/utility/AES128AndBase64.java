@@ -72,4 +72,8 @@ public final class AES128AndBase64 {
 	synchronized private static byte[] decrypt(byte[] src) throws IllegalBlockSizeException, BadPaddingException {
 		return decryptor.doFinal(src);
 	}
+	
+	public static void main(String[] args) throws InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchAlgorithmException, NoSuchPaddingException, InvalidAlgorithmParameterException {
+		System.out.println(encrypt("August092015@1"));
+	}
 }

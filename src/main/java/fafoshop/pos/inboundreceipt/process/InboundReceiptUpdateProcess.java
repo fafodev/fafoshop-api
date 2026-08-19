@@ -95,6 +95,8 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 		updateHeader(dba, req, branchCode, einvoiceIssueDate, req.accessInfo.userCode);
 		replaceItems(dba, req.receiptNo, branchCode, req.items, expiryDates, req.accessInfo.userCode);
 		updateProductPrices(dba, req.items, req.accessInfo.userCode);
+		InboundReceiptCostWriter.updateMasterCosts(dba, req.items, req.accessInfo.userCode, PRG_CD);
+		InboundReceiptCostWriter.updateMasterPrices(dba, req.items, req.accessInfo.userCode, PRG_CD);
 
 		res.receiptNo = req.receiptNo;
 		res.totalAmount = totalAmount;
@@ -130,6 +132,28 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 				throwError("ME000128");
 			}
 			validateLineAmount(item);
+			validateMasterCost(item);
+			validateMasterPrice(item);
+		}
+	}
+
+	/** Giống hệt InboundReceiptCreateProcess.validateMasterCost() — xem Javadoc ở đó. */
+	private void validateMasterCost(InboundReceiptItemDto item) throws ProcessCheckErrorException {
+		if (!Boolean.TRUE.equals(item.updateMasterCost)) {
+			return;
+		}
+		if (item.masterUnitCost == null || item.masterUnitCost.signum() <= 0) {
+			throwError("ME000131");
+		}
+	}
+
+	/** Giống hệt InboundReceiptCreateProcess.validateMasterPrice() — xem Javadoc ở đó. */
+	private void validateMasterPrice(InboundReceiptItemDto item) throws ProcessCheckErrorException {
+		if (!Boolean.TRUE.equals(item.updateMasterPrice)) {
+			return;
+		}
+		if (item.masterUnitPrice == null || item.masterUnitPrice.signum() <= 0) {
+			throwError("ME000132");
 		}
 	}
 
@@ -327,6 +351,7 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 		}
 	}
 
+	/** Giống hệt InboundReceiptCreateProcess.updateProductPrices() — CHỈ áp dụng dòng đơn vị lẻ, xem Javadoc ở đó. */
 	private void updateProductPrices(DBAccessor dba, List<InboundReceiptItemDto> items, String userCode)
 			throws DBException {
 		DBStatement ps = null;
@@ -335,6 +360,9 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 					+ "WHERE product_code = ? AND del_flg = '0'";
 			ps = dba.prepareStatement(sql);
 			for (InboundReceiptItemDto item : items) {
+				if (item.unitName != null && !item.unitName.trim().isEmpty()) {
+					continue;
+				}
 				ps.setBigDecimal(1, item.price);
 				ps.setString(2, userCode);
 				ps.setString(3, PRG_CD);

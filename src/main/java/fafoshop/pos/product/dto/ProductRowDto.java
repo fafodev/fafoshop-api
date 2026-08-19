@@ -37,16 +37,14 @@ public class ProductRowDto extends AbstractDto {
 	public boolean hasUnits;
 
 	/**
-	 * Giá vốn BÌNH QUÂN GIA QUYỀN hiện tại của sản phẩm — tính CHUNG mọi chi
-	 * nhánh (KHÁC `sale_order_item.unit_cost` vốn chụp lại THEO CHI NHÁNH tại
-	 * thời điểm bán, xem retail-domain.md mục "Giá vốn & tiền lãi") — chỉ 1
-	 * chi nhánh CN001 có dữ liệu hiện tại nên chưa khác biệt thực tế, đơn
-	 * giản hoá có chủ đích vì field này CHỈ dùng làm CẢNH BÁO tham khảo ở màn
-	 * Nhập hàng ("giá vốn nhập vào lệch bất thường"), KHÔNG phải số liệu tài
-	 * chính chính thức nào. NULL nếu sản phẩm CHƯA TỪNG có phiếu nhập nào
-	 * (không có gì để so sánh, không phải giá vốn = 0). NULLABLE (kế thừa
-	 * AbstractDto, @JsonInclude(NON_NULL)) — frontend PHẢI check cả `null`
-	 * lẫn `undefined`.
+	 * Giá vốn hiện hành của đơn vị lẻ — CẤU HÌNH TRỰC TIẾP trong Product
+	 * Master (sửa tay ở đây, hoặc Nhập hàng đổi giá thì hỏi xác nhận rồi ghi
+	 * đè), KHÔNG còn tính bình quân gia quyền từ inbound_receipt_item nữa
+	 * (thay thế hẳn field {@code currentAvgCost} cũ — xem
+	 * docs/pos-dong-bo-gia.md). NULL = chưa từng cấu hình/chưa nhập hàng lần
+	 * nào (KHÔNG phải giá vốn = 0). NULLABLE (kế thừa AbstractDto,
+	 * @JsonInclude(NON_NULL)) — frontend PHẢI check cả `null` lẫn
+	 * `undefined`.
 	 */
-	public BigDecimal currentAvgCost;
+	public BigDecimal cost;
 }

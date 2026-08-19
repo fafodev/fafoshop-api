@@ -36,6 +36,16 @@ final class ProductFieldValidator {
 		validateBarcodeUnique(dba, barcode, excludeProductCode);
 	}
 
+	/**
+	 * Giá vốn KHÔNG bắt buộc (null hợp lệ = chưa cấu hình/chưa nhập hàng lần
+	 * nào, xem docs/pos-dong-bo-gia.md) — chỉ chặn giá trị âm.
+	 */
+	static void validateCost(BigDecimal cost) throws ProcessCheckErrorException {
+		if (cost != null && cost.signum() < 0) {
+			throwError("ME000129");
+		}
+	}
+
 	/** null hợp lệ (Process tự áp mặc định 90 ngày) — chỉ chặn giá trị âm. */
 	static void validateExpiryWarningDays(Integer expiryWarningDays) throws ProcessCheckErrorException {
 		if (expiryWarningDays != null && expiryWarningDays < 0) {

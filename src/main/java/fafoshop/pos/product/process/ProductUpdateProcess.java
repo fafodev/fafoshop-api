@@ -49,6 +49,7 @@ public class ProductUpdateProcess extends AbstractProcess {
 		ProductUpdateResponse res = (ProductUpdateResponse) response;
 
 		ProductFieldValidator.validate(dba, req.name, req.price, req.barcode, req.productCode);
+		ProductFieldValidator.validateCost(req.cost);
 		ProductCategoryValidator.validate(dba, req.categoryCode);
 		ProductSupplierValidator.validate(dba, req.suppliers);
 		ProductUnitValidator.validate(req.productUnits);
@@ -58,7 +59,7 @@ public class ProductUpdateProcess extends AbstractProcess {
 			StringBuilder sql = new StringBuilder();
 			sql.append("UPDATE product SET ");
 			sql.append("name = ?, short_name = ?, barcode = ?, category_code = ?, ");
-			sql.append("unit_name = ?, reduced_tax_rate_flg = ?, price = ?, min_stock_qty = ?, ");
+			sql.append("unit_name = ?, reduced_tax_rate_flg = ?, price = ?, cost = ?, min_stock_qty = ?, ");
 			sql.append("update_user_code = ?, update_program = ? ");
 			sql.append("WHERE product_code = ? AND del_flg = '0'");
 
@@ -70,10 +71,11 @@ public class ProductUpdateProcess extends AbstractProcess {
 			ps.setString(5, req.unitName);
 			ps.setString(6, req.reducedTaxRateFlg);
 			ps.setBigDecimal(7, req.price);
-			ps.setInt(8, req.minStockQty != null ? req.minStockQty : 0);
-			ps.setString(9, req.accessInfo.userCode);
-			ps.setString(10, PRG_CD);
-			ps.setString(11, req.productCode);
+			ps.setBigDecimal(8, req.cost);
+			ps.setInt(9, req.minStockQty != null ? req.minStockQty : 0);
+			ps.setString(10, req.accessInfo.userCode);
+			ps.setString(11, PRG_CD);
+			ps.setString(12, req.productCode);
 
 			int affected = ps.executeUpdate();
 			if (affected == 0) {

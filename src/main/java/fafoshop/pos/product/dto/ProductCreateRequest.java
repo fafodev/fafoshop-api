@@ -14,6 +14,8 @@ public class ProductCreateRequest extends AbstractRequest {
 	public String unitName;
 	public String reducedTaxRateFlg;
 	public BigDecimal price;
+	/** Giá vốn hiện hành đơn vị lẻ — KHÔNG bắt buộc (sản phẩm mới có thể chưa nhập hàng lần nào), xem docs/pos-dong-bo-gia.md. */
+	public BigDecimal cost;
 	public Integer minStockQty;
 	/** Số ngày cảnh báo trước hạn sử dụng — null thì Process tự áp mặc định 90 ngày. */
 	public Integer expiryWarningDays;
