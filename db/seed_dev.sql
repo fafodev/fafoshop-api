@@ -49,6 +49,21 @@ VALUES
    'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE bank_bin = VALUES(bank_bin);
 
+-- Thông tin hộ kinh doanh của CN001 — in ở đầu Sổ S1a-HKD khi xuất báo cáo
+-- doanh thu phục vụ kê khai thuế (Thông tư 152/2025/TT-BTC). Đây LÀ thông
+-- tin thật của hộ kinh doanh (đối chiếu Thue/KY_KHAI_BAO_THUE_HKD_DUOI_1_TY.md
+-- ở gốc workspace, không phải dữ liệu giả như bank_account seed ở trên) —
+-- sửa lại nếu hộ kinh doanh đổi tên/địa chỉ/MST/điện thoại/email. phone/email
+-- CHƯA có thông tin thật (tài liệu Thue không đề cập) nên tạm để NULL — điền
+-- lại khi có.
+INSERT INTO hkd_info
+  (branch_code, hkd_name, address, tax_code, phone, email, del_flg,
+   entry_user_code, entry_program, update_user_code, update_program)
+VALUES
+  ('CN001', 'fafo', '333 Đống Đa, TP Huế', '046985092925', NULL, NULL, '0',
+   'system', 'SEED', 'system', 'SEED')
+ON DUPLICATE KEY UPDATE hkd_name = VALUES(hkd_name), address = VALUES(address), tax_code = VALUES(tax_code);
+
 INSERT INTO app_function
   (function_code, name, short_name, menu_show_flg, auth_required_flg, del_flg,
    entry_user_code, entry_program, update_user_code, update_program)

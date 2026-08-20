@@ -215,6 +215,31 @@ CREATE TABLE bank_account (
 );
 
 -- ----------------------------------------------------------------------------
+-- hkd_info — thông tin hộ kinh doanh/cá nhân kinh doanh in ở đầu Sổ S1a-HKD
+-- (Thông tư 152/2025/TT-BTC) khi xuất báo cáo doanh thu phục vụ kê khai
+-- thuế. Theo branch_code như bank_account (dự án hiện chỉ có 1 chi nhánh).
+-- CHƯA có màn quản lý riêng — sửa trực tiếp DB, giống bank_account. Xem
+-- Thue/KY_KHAI_BAO_THUE_HKD_DUOI_1_TY.md mục 3b/3c (thư mục gốc workspace).
+-- ----------------------------------------------------------------------------
+CREATE TABLE hkd_info (
+  branch_code      VARCHAR(6)    NOT NULL COMMENT 'Mã chi nhánh (khoá chính)',
+  hkd_name         VARCHAR(100)  NOT NULL COMMENT 'Tên hộ, cá nhân kinh doanh (in ở đầu Sổ S1a-HKD)',
+  address          VARCHAR(200)  NOT NULL COMMENT 'Địa chỉ kinh doanh (in ở đầu Sổ S1a-HKD)',
+  tax_code         VARCHAR(14)   NOT NULL COMMENT 'Mã số thuế hộ kinh doanh',
+  phone            VARCHAR(14)   NULL COMMENT 'Số điện thoại liên hệ của hộ kinh doanh (không bắt buộc)',
+  email            VARCHAR(100)  NULL COMMENT 'Email liên hệ của hộ kinh doanh (không bắt buộc)',
+  del_flg          VARCHAR(1)    NOT NULL DEFAULT '0' COMMENT 'Cờ xoá mềm: 1=đã xoá, 0=còn hiệu lực',
+  entry_user_code  VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
+  entry_datetime   TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
+  entry_program    VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình tạo bản ghi',
+  update_user_code VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng cập nhật gần nhất',
+  update_datetime  TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm cập nhật gần nhất',
+  update_program   VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
+  PRIMARY KEY (branch_code),
+  CONSTRAINT fk_hkdinfo_branch FOREIGN KEY (branch_code) REFERENCES branch (branch_code)
+);
+
+-- ----------------------------------------------------------------------------
 -- stock — theo dõi tồn kho theo (branch_code, product_code), không theo dõi
 -- vị trí kho vật lý chi tiết (đơn giản hoá cho quy mô 1 cửa hàng nhỏ).
 -- ----------------------------------------------------------------------------
