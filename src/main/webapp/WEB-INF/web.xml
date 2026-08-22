@@ -15,4 +15,9 @@
     <servlet-name>Jersey Web Application</servlet-name>
     <url-pattern>/api/*</url-pattern>
   </servlet-mapping>
+
+  <!-- SPA Angular ở ROOT: / trả index.html. Jersey chỉ giữ /api/*. -->
+  <welcome-file-list>
+    <welcome-file>index.html</welcome-file>
+  </welcome-file-list>
 </web-app>

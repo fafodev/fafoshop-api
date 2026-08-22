@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 
 /**
  * Bootstrap Spring Boot CHỈ để dựng nhanh Tomcat nhúng (embedded) chạy
@@ -17,11 +16,15 @@ import org.springframework.boot.web.servlet.support.SpringBootServletInitializer
  * Process/WebService vẫn JDBC thuần qua DBAccessor/DBStatement như quy ước
  * dự án (xem coding-rules.md).
  *
- * File build ra vẫn là .war (xem pom.xml) để deploy Tomcat thật — cách chạy
- * này chỉ phục vụ dev cục bộ, không ảnh hưởng bản build/deploy thật.
+ * File build ra vẫn là .war (xem pom.xml) để deploy Tomcat thật. Class này
+ * KHÔNG kế thừa SpringBootServletInitializer — nếu kế thừa, Tomcat sẽ
+ * khởi động Spring MVC (DispatcherServlet map /) và nuốt request SPA
+ * (index.html), trả trang lỗi 404 Whitelabel thay vì file tĩnh. WAR trên
+ * Tomcat thật chỉ dùng web.xml (Jersey /api/* + DefaultServlet phục vụ
+ * frontend).
  */
 @SpringBootApplication
-public class FafoshopApplication extends SpringBootServletInitializer {
+public class FafoshopApplication {
 
 	private static final Logger logger = LoggerFactory.getLogger(FafoshopApplication.class);
 
