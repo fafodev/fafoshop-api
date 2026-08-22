@@ -3,10 +3,14 @@ package fafoshop.pos.product.process;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.text.Normalizer;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import fafoshop.pos.product.dto.ProductRowDto;
 
@@ -40,6 +44,16 @@ final class ProductQueryHelper {
 
 	private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+	/** Tách từ: khoảng trắng thường, NBSP (Unikey), mọi separator Unicode. */
+	private static final Pattern KEYWORD_TOKENS = Pattern.compile("[\\p{Z}\\s]+");
+
+	/**
+	 * Bỏ dấu tiếng Việt trên CỘT (identifier whitelist, không phải input
+	 * người dùng) để LIKE khớp cả "Sữa" lẫn "sua".
+	 */
+	private static final String FOLDED_NAME_SQL = foldedColumnSql("p.name");
+	private static final String FOLDED_SHORT_NAME_SQL = foldedColumnSql("p.short_name");
+
 	/**
 	 * Whitelist cứng tên cột sort — KHÔNG được ghép thẳng sortField của client
 	 * vào SQL vì đây là identifier động (xem coding-rules.md).
@@ -65,15 +79,99 @@ final class ProductQueryHelper {
 		}
 
 		if (keyword != null && !keyword.trim().isEmpty()) {
-			where.append("AND (p.name LIKE ? OR p.barcode = ?) ");
-			params.add("%" + keyword.trim() + "%");
-			params.add(keyword.trim());
+			appendKeywordFilter(keyword.trim(), where, params);
 		}
 
 		if (categoryCode != null && !categoryCode.trim().isEmpty()) {
 			where.append("AND p.category_code = ? ");
 			params.add(categoryCode.trim());
 		}
+	}
+
+	/**
+	 * Mỗi từ phải có trong tên hoặc tên ngắn (không cần liền nhau, không phân
+	 * biệt dấu) — gõ "Sữa TH" / "sua th" ra "Sữa Trái Cây TH True Juice...".
+	 * Mã vạch khớp đúng chuỗi đã gõ. Token gắn {@code ?}.
+	 */
+	private static void appendKeywordFilter(String trimmed, StringBuilder where, List<String> params) {
+		String normalized = normalizeKeyword(trimmed);
+		List<String> tokens = tokenizeKeyword(normalized);
+		if (tokens.isEmpty()) {
+			return;
+		}
+
+		where.append("AND (");
+		where.append("(");
+		for (int i = 0; i < tokens.size(); i++) {
+			if (i > 0) {
+				where.append(" AND ");
+			}
+			where.append("(").append(FOLDED_NAME_SQL).append(" LIKE ? OR ").append(FOLDED_SHORT_NAME_SQL)
+					.append(" LIKE ?)");
+			String like = "%" + foldVi(tokens.get(i)) + "%";
+			params.add(like);
+			params.add(like);
+		}
+		where.append(") OR p.barcode = ?");
+		params.add(normalized);
+		where.append(") ");
+	}
+
+	private static String normalizeKeyword(String keyword) {
+		return Normalizer.normalize(keyword.trim(), Normalizer.Form.NFC).replace('\u00A0', ' ').trim();
+	}
+
+	private static List<String> tokenizeKeyword(String normalized) {
+		String[] raw = KEYWORD_TOKENS.split(normalized);
+		List<String> tokens = new ArrayList<String>();
+		for (int i = 0; i < raw.length && tokens.size() < 10; i++) {
+			if (!raw[i].isEmpty()) {
+				tokens.add(raw[i]);
+			}
+		}
+		return tokens;
+	}
+
+	/** Bỏ dấu + đ→d, ư→u, ơ→o để so với {@link #foldedColumnSql}. */
+	private static String foldVi(String input) {
+		String nfd = Normalizer.normalize(input, Normalizer.Form.NFD);
+		String stripped = nfd.replaceAll("\\p{M}+", "");
+		StringBuilder out = new StringBuilder(stripped.length());
+		for (int i = 0; i < stripped.length(); i++) {
+			char c = stripped.charAt(i);
+			if (c == 'đ' || c == 'Đ') {
+				out.append('d');
+			} else if (c == 'ư' || c == 'Ư') {
+				out.append('u');
+			} else if (c == 'ơ' || c == 'Ơ') {
+				out.append('o');
+			} else if (c == 'ă' || c == 'Ă') {
+				out.append('a');
+			} else {
+				out.append(c);
+			}
+		}
+		return out.toString().toLowerCase(Locale.ROOT);
+	}
+
+	/**
+	 * {@code qualifiedColumn} phải là identifier cứng {@code p.name}/
+	 * {@code p.short_name} — không nhận chuỗi từ client.
+	 */
+	private static String foldedColumnSql(String qualifiedColumn) {
+		if (!"p.name".equals(qualifiedColumn) && !"p.short_name".equals(qualifiedColumn)) {
+			throw new IllegalArgumentException("Cột tìm kiếm không hợp lệ");
+		}
+		String expr = "LOWER(" + qualifiedColumn + ")";
+		String[] from = { "à", "á", "ả", "ã", "ạ", "ă", "ằ", "ắ", "ẳ", "ẵ", "ặ", "â", "ầ", "ấ", "ẩ", "ẫ", "ậ", "è", "é",
+				"ẻ", "ẽ", "ẹ", "ê", "ề", "ế", "ể", "ễ", "ệ", "ì", "í", "ỉ", "ĩ", "ị", "ò", "ó", "ỏ", "õ", "ọ", "ô", "ồ",
+				"ố", "ổ", "ỗ", "ộ", "ơ", "ờ", "ớ", "ở", "ỡ", "ợ", "ù", "ú", "ủ", "ũ", "ụ", "ư", "ừ", "ứ", "ử", "ữ", "ự",
+				"ỳ", "ý", "ỷ", "ỹ", "ỵ", "đ" };
+		for (int i = 0; i < from.length; i++) {
+			char mapped = foldVi(from[i]).charAt(0);
+			expr = "REPLACE(" + expr + ", '" + from[i] + "', '" + mapped + "')";
+		}
+		return expr;
 	}
 
 	static String resolveSortColumn(String sortField) {
@@ -101,9 +199,26 @@ final class ProductQueryHelper {
 	static String buildOrderByClause(String keyword, String sortColumn, String sortDirection, List<String> params) {
 		StringBuilder orderBy = new StringBuilder("ORDER BY ");
 		if (keyword != null && !keyword.trim().isEmpty()) {
-			orderBy.append("CASE WHEN p.barcode = ? OR p.name = ? THEN 0 ELSE 1 END, ");
-			params.add(keyword.trim());
-			params.add(keyword.trim());
+			String normalized = normalizeKeyword(keyword);
+			List<String> tokens = tokenizeKeyword(normalized);
+
+			orderBy.append("CASE WHEN p.barcode = ? OR p.name = ? THEN 0 ");
+			params.add(normalized);
+			params.add(normalized);
+			if (tokens.size() >= 2) {
+				orderBy.append("WHEN ").append(FOLDED_NAME_SQL).append(" LIKE ? THEN 1 ");
+				StringBuilder inOrder = new StringBuilder("%");
+				for (int i = 0; i < tokens.size(); i++) {
+					inOrder.append(foldVi(tokens.get(i))).append("%");
+				}
+				params.add(inOrder.toString());
+			}
+			if (!tokens.isEmpty()) {
+				orderBy.append("WHEN ").append(FOLDED_NAME_SQL).append(" LIKE ? THEN 2 ELSE 3 END, ");
+				params.add(foldVi(tokens.get(0)) + "%");
+			} else {
+				orderBy.append("ELSE 1 END, ");
+			}
 		}
 		orderBy.append(sortColumn).append(" ").append(sortDirection).append(" ");
 		return orderBy.toString();
