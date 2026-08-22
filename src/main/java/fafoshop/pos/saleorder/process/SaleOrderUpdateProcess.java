@@ -34,10 +34,10 @@ import fafoshop.pos.saleorder.dto.SaleOrderUpdateResponse;
  *
  * Điều kiện được sửa: xem {@link SaleOrderEditGuard}. Tồn kho điều chỉnh
  * theo DELTA (số lượng mới - số lượng cũ từng sản phẩm), xem
- * {@link SaleOrderStockAdjuster}. Giá vốn (`unit_cost`) của MỌI dòng — kể
- * cả dòng đã có từ trước, không chỉ dòng mới thêm — được tính lại theo bình
- * quân gia quyền TẠI THỜI ĐIỂM SỬA (nhất quán với chiến lược "thay hết",
- * không cố giữ snapshot cũ cho dòng không đổi).
+ * {@link SaleOrderStockAdjuster}. Giá vốn (`unit_cost`): nếu client gửi
+ * {@link SaleOrderItemDto#unitCost} (sửa tay trên dialog) thì dùng thẳng
+ * snapshot đó; không gửi thì lấy từ Product Master tại thời điểm sửa (xem
+ * {@code resolveUnitCost}).
  */
 public class SaleOrderUpdateProcess extends AbstractProcess {
 
@@ -117,6 +117,9 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 			}
 			if (item.unitPrice == null || item.unitPrice.signum() < 0) {
 				throwError("ME000067");
+			}
+			if (item.unitCost != null && item.unitCost.signum() < 0) {
+				throwError("ME000129");
 			}
 			validateLineAmount(item);
 		}
@@ -218,7 +221,9 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 			int lineNo = 1;
 			for (SaleOrderItemDto item : items) {
 				BigDecimal lineAmount = effectiveLineAmount(item);
-				BigDecimal unitCost = resolveUnitCost(dba, item.productCode, item.unitName);
+				BigDecimal unitCost = item.unitCost != null
+						? item.unitCost
+						: resolveUnitCost(dba, item.productCode, item.unitName);
 
 				insertPs.setString(1, saleOrderNo);
 				insertPs.setInt(2, lineNo++);

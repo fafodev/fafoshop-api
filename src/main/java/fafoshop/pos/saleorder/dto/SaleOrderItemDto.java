@@ -44,4 +44,13 @@ public class SaleOrderItemDto {
 	 * nghĩa khi `unitName` khác null, xem Javadoc `unitName`.
 	 */
 	public Integer unitQty;
+
+	/**
+	 * Giá vốn per-lẻ (snapshot trên dòng đơn) — KHÔNG BẮT BUỘC lúc tạo đơn
+	 * (server tự lấy từ Product Master). Khi sửa đơn, nếu client gửi giá trị
+	 * (kể cả 0) thì dùng thẳng, KHÔNG ghi đè bằng Master — để giữ giá nhập
+	 * vừa sửa chỉ cho hoá đơn này. Không gửi (null) → server resolve từ
+	 * Master như cũ. Xem docs/pos-dong-bo-gia.md.
+	 */
+	public BigDecimal unitCost;
 }

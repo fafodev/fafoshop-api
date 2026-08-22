@@ -62,7 +62,7 @@ final class ProductFieldValidator {
 		}
 	}
 
-	private static void validatePrice(BigDecimal price) throws ProcessCheckErrorException {
+	static void validatePrice(BigDecimal price) throws ProcessCheckErrorException {
 		if (price == null) {
 			throwError("ME000066");
 		}

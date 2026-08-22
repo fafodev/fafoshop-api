@@ -9,10 +9,12 @@
   `report`), mỗi module có `dto/`, `process/`, `webservice/` — xem vai trò
   từng module trong `retail-domain.md`. `report` chỉ có 1 action tổng
   hợp `dashboardSummary` cho màn Tổng quan `fafoshop` — xem
-  `../../docs/pos-tong-quan-dashboard.md`. `product` có thêm action
+  `../../docs/pos-tong-quan-dashboard.md`.   `product` có thêm action
   `unit/list` + field `productUnits` trong create/update (bảng con
   `product_unit` — đơn vị đóng gói Lốc/Thùng, xem
-  `../../docs/pos-da-don-vi-tinh.md`). `product`/`product_unit` có thêm cột
+  `../../docs/pos-da-don-vi-tinh.md`). `product` có thêm `syncprice` (ghi đè
+  giá bán/giá vốn đúng 1 ĐVT khi sửa đơn, xem `../../docs/pos-sua-huy-don.md`
+  + `../../docs/pos-dong-bo-gia.md`). `product`/`product_unit` có thêm cột
   `cost`/`unit_cost` (giá vốn cấu hình trực tiếp, thay bình quân gia quyền
   — xem `../../docs/pos-dong-bo-gia.md`). `saleorder`/`inboundreceipt` có
   thêm action `update`/`void` (sửa/huỷ đơn bán/phiếu nhập đã tạo — xem
