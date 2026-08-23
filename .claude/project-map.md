@@ -6,10 +6,13 @@
 - Hạ tầng dùng chung: `src/main/java/fafoshop/common`.
 - Module nghiệp vụ: `src/main/java/fafoshop/pos/<module>` (`auth`, `product`,
   `category`, `supplier`, `saleorder`, `inboundreceipt`, `bankaccount`,
-  `report`), mỗi module có `dto/`, `process/`, `webservice/` — xem vai trò
+  `report`, `stocktake`, `stock`), mỗi module có `dto/`, `process/`, `webservice/` — xem vai trò
   từng module trong `retail-domain.md`. `report` chỉ có 1 action tổng
   hợp `dashboardSummary` cho màn Tổng quan `fafoshop` — xem
-  `../../docs/pos-tong-quan-dashboard.md`.   `product` có thêm action
+  `../../docs/pos-tong-quan-dashboard.md`. `stocktake` có `list`/`save`
+  (kiểm kê ghi đè từng lô `stock`, không phiếu lịch sử — xem
+  `../../docs/pos-kiem-ke.md` + `../../docs/pos-lo-ton-kho.md`). `stock` có
+  `POST /lots` (lô còn hàng lúc bán).   `product` có thêm action
   `unit/list` + field `productUnits` trong create/update (bảng con
   `product_unit` — đơn vị đóng gói Lốc/Thùng, xem
   `../../docs/pos-da-don-vi-tinh.md`). `product` có thêm `syncprice` (ghi đè
@@ -19,7 +22,8 @@
   — xem `../../docs/pos-dong-bo-gia.md`). `saleorder`/`inboundreceipt` có
   thêm action `update`/`void` (sửa/huỷ đơn bán/phiếu nhập đã tạo — xem
   `../../docs/pos-sua-huy-don.md`), `inboundreceipt` có thêm
-  `search`/`detail` (trước đây CHỈ có `create`).
+  `search`/`detail` (trước đây CHỈ có `create`). `pos.auth` có thêm
+  `POST /menu` (mã chức năng `menu_show_flg='1'` để sidebar lọc).
 - Bootstrap: `web.xml` (Jersey `ServletContainer`, quét package `fafoshop`,
   mount tại `/api/*`). Lúc dev cũng có thể chạy thẳng
   `fafoshop.FafoshopApplication` (Spring Boot embedded Tomcat, xem
@@ -42,10 +46,10 @@
   `docs/pos-tra-cuu-ban-hang.md`), Sản phẩm, Danh mục, Nhà cung cấp, Nhập
   hàng (`pos.inboundreceipt`), Tổng quan (`pos.report`); không còn dùng
   `alert()`/state cục bộ cho các màn này.
-- `pos.saleorder.create` (`SaleOrderCreateProcess`) trừ tồn kho (`stock`)
-  ngay khi bán — floor tại 0 nếu tồn chưa ghi nhận đủ, KHÔNG chặn bán hàng
-  khi thiếu dữ liệu tồn kho lịch sử. Xem chi tiết + lý do
-  `docs/pos-tong-quan-dashboard.md` mục 5.
+- `pos.saleorder.create` (`SaleOrderCreateProcess`) trừ tồn theo **lô**
+  (`stock.stock_code`) — floor tại 0 trên đúng lô đã chọn, KHÔNG chặn bán
+  khi chưa có dòng tồn. ≥ 2 lô còn hàng thì bắt buộc chọn hạn dùng. Xem
+  `docs/pos-lo-ton-kho.md` và `docs/pos-tong-quan-dashboard.md` mục 5.
 
 UNKNOWN:
 

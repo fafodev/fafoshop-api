@@ -22,7 +22,8 @@ VALUES
   ('DM', 0, 4, 'Mã danh mục (category.category_code)', 'system', 'SEED', 'system', 'SEED'),
   ('SP', 0, 4, 'Mã sản phẩm (product.product_code)', 'system', 'SEED', 'system', 'SEED'),
   ('HD', 0, 4, 'Số đơn bán hàng (sale_order.sale_order_no)', 'system', 'SEED', 'system', 'SEED'),
-  ('PN', 0, 4, 'Số phiếu nhập hàng (inbound_receipt.receipt_no)', 'system', 'SEED', 'system', 'SEED')
+  ('PN', 0, 4, 'Số phiếu nhập hàng (inbound_receipt.receipt_no)', 'system', 'SEED', 'system', 'SEED'),
+  ('IS', 0, 4, 'Mã lô tồn kho (stock.stock_code)', 'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE description = VALUES(description);
 
 -- Chi nhánh mặc định — sale_order.branch_code là FK bắt buộc nhưng dự án
@@ -86,7 +87,8 @@ VALUES
   ('INBND_VIEW', 'Tra cứu phiếu nhập hàng', 'Tra cứu nhập', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('INBND_EDIT', 'Sửa/huỷ phiếu nhập (tự tạo, 15 phút)', 'Sửa phiếu nhập', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('INBND_MGR', 'QL sửa/huỷ phiếu nhập (không giới hạn)', 'QL phiếu nhập', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
-  ('RPT_VIEW', 'Xem tổng quan/báo cáo', 'Tổng quan', '1', '1', '0', 'system', 'SEED', 'system', 'SEED')
+  ('RPT_VIEW', 'Xem tổng quan/báo cáo', 'Tổng quan', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
+  ('STK_EDIT', 'Kiểm kê tồn kho', 'Kiểm kê', '1', '1', '0', 'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 INSERT INTO app_user
@@ -118,7 +120,8 @@ VALUES
   ('admin', 'INBND_VIEW', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'INBND_EDIT', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'INBND_MGR', '1', 'system', 'SEED', 'system', 'SEED'),
-  ('admin', 'RPT_VIEW', '1', 'system', 'SEED', 'system', 'SEED')
+  ('admin', 'RPT_VIEW', '1', 'system', 'SEED', 'system', 'SEED'),
+  ('admin', 'STK_EDIT', '1', 'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE auth_type = VALUES(auth_type);
 
 INSERT INTO category

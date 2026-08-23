@@ -54,6 +54,7 @@ mới để tránh trùng):
 | `SP` | `product.product_code` | 4 |
 | `HD` | `sale_order.sale_order_no` | 4 |
 | `PN` | `inbound_receipt.receipt_no` | 4 |
+| `IS` | `stock.stock_code` | 4 |
 
 Thêm module mới cần mã tự sinh → thêm 1 dòng `INSERT ... INTO seq_no` mới
 (prefix ngắn gọn viết HOA, dễ nhận diện, tối đa 4 ký tự) vào

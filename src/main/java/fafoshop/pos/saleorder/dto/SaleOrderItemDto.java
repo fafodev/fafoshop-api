@@ -53,4 +53,13 @@ public class SaleOrderItemDto {
 	 * Master như cũ. Xem docs/pos-dong-bo-gia.md.
 	 */
 	public BigDecimal unitCost;
+
+	/**
+	 * Mã lô tồn (stock.stock_code). Bắt buộc khi sản phẩm có từ 2 lô còn hàng
+	 * — xem docs/pos-lo-ton-kho.md. null = server tự chọn (0 hoặc 1 lô).
+	 */
+	public String stockCode;
+
+	/** Hạn dùng lô, yyyy-MM-dd — client có thể gửi; server chụp lại từ stock khi lưu. */
+	public String expiryDate;
 }

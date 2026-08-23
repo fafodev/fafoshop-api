@@ -2,6 +2,7 @@ package fafoshop.pos.saleorder.process;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ import fafoshop.common.utility.MessageUtility;
 import fafoshop.pos.saleorder.dto.SaleOrderItemDto;
 import fafoshop.pos.saleorder.dto.SaleOrderUpdateRequest;
 import fafoshop.pos.saleorder.dto.SaleOrderUpdateResponse;
+import fafoshop.pos.stock.process.StockLotHelper;
 
 /**
  * Sửa lại TOÀN BỘ danh sách dòng hàng của 1 đơn bán đã tạo — chiến lược
@@ -76,21 +78,15 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 
 		String branchCode = SaleOrderEditGuard.resolveEligibleBranchCode(dba, req.saleOrderNo, req.accessInfo.userCode);
 
-		Map<String, Integer> oldQtyByProduct = queryCurrentQuantities(dba, req.saleOrderNo);
-		Map<String, Integer> newQtyByProduct = new HashMap<>();
-		for (SaleOrderItemDto item : req.items) {
-			newQtyByProduct.merge(item.productCode, item.quantity, Integer::sum);
-		}
-
 		Map<String, Integer> delta = new HashMap<>();
-		for (Map.Entry<String, Integer> e : newQtyByProduct.entrySet()) {
-			delta.merge(e.getKey(), e.getValue(), Integer::sum);
-		}
-		for (Map.Entry<String, Integer> e : oldQtyByProduct.entrySet()) {
-			delta.merge(e.getKey(), -e.getValue(), Integer::sum);
+		accOldSaleLotQuantities(dba, req.saleOrderNo, branchCode, req.accessInfo.userCode, delta);
+		for (SaleOrderItemDto item : req.items) {
+			item.stockCode = StockLotHelper.resolveStockCodeForSale(dba, branchCode, item.productCode, item.stockCode,
+					req.accessInfo.userCode, PRG_CD);
+			delta.merge(item.stockCode, item.quantity, Integer::sum);
 		}
 
-		SaleOrderStockAdjuster.applyDelta(dba, branchCode, delta, req.accessInfo.userCode, PRG_CD);
+		SaleOrderStockAdjuster.applyDelta(dba, delta, req.accessInfo.userCode, PRG_CD);
 
 		replaceItems(dba, req.saleOrderNo, branchCode, req.items, req.accessInfo.userCode);
 
@@ -175,19 +171,24 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 		}
 	}
 
-	private Map<String, Integer> queryCurrentQuantities(DBAccessor dba, String saleOrderNo) throws DBException {
-		Map<String, Integer> result = new HashMap<>();
+	private void accOldSaleLotQuantities(DBAccessor dba, String saleOrderNo, String branchCode, String userCode,
+			Map<String, Integer> delta) throws DBException, FatalException {
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
-			String sql = "SELECT product_code, quantity FROM sale_order_item WHERE sale_order_no = ?";
+			String sql = "SELECT stock_code, product_code, expiry_date, quantity FROM sale_order_item "
+					+ "WHERE sale_order_no = ?";
 			ps = dba.prepareStatement(sql);
 			ps.setString(1, saleOrderNo);
 			rs = ps.executeQuery();
 			while (rs.next()) {
-				result.merge(rs.getString("product_code"), rs.getInt("quantity"), Integer::sum);
+				String stockCode = rs.getString("stock_code");
+				if (stockCode == null || stockCode.trim().isEmpty()) {
+					stockCode = StockLotHelper.findOrCreate(dba, branchCode, rs.getString("product_code"),
+							rs.getDate("expiry_date"), userCode, PRG_CD);
+				}
+				delta.merge(stockCode, -rs.getInt("quantity"), Integer::sum);
 			}
-			return result;
 		} catch (SQLException e) {
 			throw new DBException(e);
 		} finally {
@@ -212,10 +213,10 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 		DBStatement insertPs = null;
 		try {
 			String sql = "INSERT INTO sale_order_item "
-					+ "(sale_order_no, line_no, product_code, unit_price, quantity, line_amount, unit_cost, "
+					+ "(sale_order_no, line_no, product_code, stock_code, expiry_date, unit_price, quantity, line_amount, unit_cost, "
 					+ " unit_name, unit_qty, "
 					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 			insertPs = dba.prepareStatement(sql);
 			int lineNo = 1;
@@ -224,20 +225,23 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 				BigDecimal unitCost = item.unitCost != null
 						? item.unitCost
 						: resolveUnitCost(dba, item.productCode, item.unitName);
+				Date expiryDate = StockLotHelper.readExpiry(dba, item.stockCode);
 
 				insertPs.setString(1, saleOrderNo);
 				insertPs.setInt(2, lineNo++);
 				insertPs.setString(3, item.productCode);
-				insertPs.setBigDecimal(4, item.unitPrice);
-				insertPs.setInt(5, item.quantity);
-				insertPs.setBigDecimal(6, lineAmount);
-				insertPs.setBigDecimal(7, unitCost);
-				insertPs.setString(8, item.unitName);
-				insertPs.setNullableInt(9, item.unitQty);
-				insertPs.setString(10, userCode);
-				insertPs.setString(11, PRG_CD);
+				insertPs.setString(4, item.stockCode);
+				insertPs.setDate(5, expiryDate);
+				insertPs.setBigDecimal(6, item.unitPrice);
+				insertPs.setInt(7, item.quantity);
+				insertPs.setBigDecimal(8, lineAmount);
+				insertPs.setBigDecimal(9, unitCost);
+				insertPs.setString(10, item.unitName);
+				insertPs.setNullableInt(11, item.unitQty);
 				insertPs.setString(12, userCode);
 				insertPs.setString(13, PRG_CD);
+				insertPs.setString(14, userCode);
+				insertPs.setString(15, PRG_CD);
 				insertPs.executeUpdate();
 			}
 		} finally {

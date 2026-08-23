@@ -2,6 +2,7 @@ package fafoshop.pos.saleorder.process;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -25,6 +26,7 @@ import fafoshop.pos.saleorder.dto.PaymentMethod;
 import fafoshop.pos.saleorder.dto.SaleOrderCreateRequest;
 import fafoshop.pos.saleorder.dto.SaleOrderCreateResponse;
 import fafoshop.pos.saleorder.dto.SaleOrderItemDto;
+import fafoshop.pos.stock.process.StockLotHelper;
 
 /**
  * Tạo đơn bán tại quầy (checkout POS thật — thay cho alert() trong
@@ -81,8 +83,12 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 
 		insertSaleOrder(dba, saleOrderNo, branchCode, req.customerName, now, req.paidAmount, changeAmount,
 				req.paymentMethod, req.accessInfo.userCode);
+		for (SaleOrderItemDto item : req.items) {
+			item.stockCode = StockLotHelper.resolveStockCodeForSale(dba, branchCode, item.productCode, item.stockCode,
+					req.accessInfo.userCode, PRG_CD);
+		}
 		insertSaleOrderItems(dba, saleOrderNo, branchCode, req.items, req.accessInfo.userCode);
-		decrementStock(dba, branchCode, req.items, req.accessInfo.userCode);
+		decrementStock(dba, req.items, req.accessInfo.userCode);
 
 		res.saleOrderNo = saleOrderNo;
 		res.subtotal = subtotal;
@@ -233,36 +239,33 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		DBStatement ps = null;
 		try {
 			String sql = "INSERT INTO sale_order_item "
-					+ "(sale_order_no, line_no, product_code, unit_price, quantity, line_amount, unit_cost, "
+					+ "(sale_order_no, line_no, product_code, stock_code, expiry_date, unit_price, quantity, line_amount, unit_cost, "
 					+ " unit_name, unit_qty, "
 					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 			ps = dba.prepareStatement(sql);
 			int lineNo = 1;
 			for (SaleOrderItemDto item : items) {
 				BigDecimal lineAmount = effectiveLineAmount(item);
 				BigDecimal unitCost = resolveUnitCost(dba, item.productCode, item.unitName);
+				Date expiryDate = StockLotHelper.readExpiry(dba, item.stockCode);
 
 				ps.setString(1, saleOrderNo);
 				ps.setInt(2, lineNo++);
 				ps.setString(3, item.productCode);
-				ps.setBigDecimal(4, item.unitPrice);
-				ps.setInt(5, item.quantity);
-				ps.setBigDecimal(6, lineAmount);
-				// setBigDecimal(idx, null) được MySQL Connector/J xử lý đúng như SQL
-				// NULL (khác setInt/setLong kiểu nguyên thuỷ không nhận null được) —
-				// không cần setNull() riêng.
-				ps.setBigDecimal(7, unitCost);
-				// unitName rỗng/null (đơn vị lẻ, đa số dòng hàng) → setString tự set
-				// SQL NULL (xem DBStatement.setString), unitQty dùng setNullableInt
-				// vì Integer (khác int nguyên thuỷ của setInt) mới nhận được null.
-				ps.setString(8, item.unitName);
-				ps.setNullableInt(9, item.unitQty);
-				ps.setString(10, userCode);
-				ps.setString(11, PRG_CD);
+				ps.setString(4, item.stockCode);
+				ps.setDate(5, expiryDate);
+				ps.setBigDecimal(6, item.unitPrice);
+				ps.setInt(7, item.quantity);
+				ps.setBigDecimal(8, lineAmount);
+				ps.setBigDecimal(9, unitCost);
+				ps.setString(10, item.unitName);
+				ps.setNullableInt(11, item.unitQty);
 				ps.setString(12, userCode);
 				ps.setString(13, PRG_CD);
+				ps.setString(14, userCode);
+				ps.setString(15, PRG_CD);
 				ps.executeUpdate();
 			}
 		} finally {
@@ -357,37 +360,9 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 	 * hàng nhỏ nhiều khi bán hàng trước, nhập liệu tồn kho lịch sử sau —
 	 * không nên chặn bán hàng chỉ vì thiếu dữ liệu tồn kho.
 	 */
-	private void decrementStock(DBAccessor dba, String branchCode, List<SaleOrderItemDto> items, String userCode)
-			throws DBException {
-
-		DBStatement ps = null;
-		try {
-			String sql = "INSERT INTO stock "
-					+ "(branch_code, product_code, quality_code, expiry_date, stock_qty, available_qty, "
-					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, '01', NULL, 0, 0, ?, ?, ?, ?) "
-					+ "ON DUPLICATE KEY UPDATE "
-					+ "stock_qty = GREATEST(stock_qty - ?, 0), "
-					+ "available_qty = GREATEST(available_qty - ?, 0), "
-					+ "update_user_code = VALUES(update_user_code), "
-					+ "update_program = VALUES(update_program)";
-
-			ps = dba.prepareStatement(sql);
-			for (SaleOrderItemDto item : items) {
-				ps.setString(1, branchCode);
-				ps.setString(2, item.productCode);
-				ps.setString(3, userCode);
-				ps.setString(4, PRG_CD);
-				ps.setString(5, userCode);
-				ps.setString(6, PRG_CD);
-				ps.setInt(7, item.quantity);
-				ps.setInt(8, item.quantity);
-				ps.executeUpdate();
-			}
-		} finally {
-			if (ps != null) {
-				ps.close();
-			}
+	private void decrementStock(DBAccessor dba, List<SaleOrderItemDto> items, String userCode) throws DBException {
+		for (SaleOrderItemDto item : items) {
+			StockLotHelper.subtractQtyFloor(dba, item.stockCode, item.quantity, userCode, PRG_CD);
 		}
 	}
 

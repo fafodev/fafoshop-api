@@ -21,6 +21,7 @@ import fafoshop.common.process.AbstractProcess;
 import fafoshop.common.utility.MessageUtility;
 import fafoshop.pos.saleorder.dto.SaleOrderVoidRequest;
 import fafoshop.pos.saleorder.dto.SaleOrderVoidResponse;
+import fafoshop.pos.stock.process.StockLotHelper;
 
 /**
  * Huỷ đơn bán — set `void_flg='1'` (THAY cho xoá cứng, cột đã có sẵn từ đầu
@@ -58,13 +59,29 @@ public class SaleOrderVoidProcess extends AbstractProcess {
 
 		String branchCode = SaleOrderEditGuard.resolveEligibleBranchCode(dba, req.saleOrderNo, req.accessInfo.userCode);
 
-		Map<String, Integer> quantities = queryCurrentQuantities(dba, req.saleOrderNo);
-		// Hoàn tác toàn bộ = delta ÂM đúng bằng số lượng gốc (cộng lại hết).
 		Map<String, Integer> delta = new HashMap<>();
-		for (Map.Entry<String, Integer> e : quantities.entrySet()) {
-			delta.put(e.getKey(), -e.getValue());
+		ResultSet rs = null;
+		DBStatement ps = null;
+		try {
+			String sql = "SELECT stock_code, product_code, expiry_date, quantity FROM sale_order_item "
+					+ "WHERE sale_order_no = ?";
+			ps = dba.prepareStatement(sql);
+			ps.setString(1, req.saleOrderNo);
+			rs = ps.executeQuery();
+			while (rs.next()) {
+				String stockCode = rs.getString("stock_code");
+				if (stockCode == null || stockCode.trim().isEmpty()) {
+					stockCode = StockLotHelper.findOrCreate(dba, branchCode, rs.getString("product_code"),
+							rs.getDate("expiry_date"), req.accessInfo.userCode, PRG_CD);
+				}
+				delta.merge(stockCode, -rs.getInt("quantity"), Integer::sum);
+			}
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			closeQuietly(rs, ps);
 		}
-		SaleOrderStockAdjuster.applyDelta(dba, branchCode, delta, req.accessInfo.userCode, PRG_CD);
+		SaleOrderStockAdjuster.applyDelta(dba, delta, req.accessInfo.userCode, PRG_CD);
 
 		markVoid(dba, req.saleOrderNo, req.accessInfo.userCode);
 
@@ -75,26 +92,6 @@ public class SaleOrderVoidProcess extends AbstractProcess {
 	private void validateSaleOrderNo(String saleOrderNo) throws ProcessCheckErrorException {
 		if (saleOrderNo == null || saleOrderNo.trim().isEmpty()) {
 			throwError("ME000120");
-		}
-	}
-
-	private Map<String, Integer> queryCurrentQuantities(DBAccessor dba, String saleOrderNo) throws DBException {
-		Map<String, Integer> result = new HashMap<>();
-		ResultSet rs = null;
-		DBStatement ps = null;
-		try {
-			String sql = "SELECT product_code, quantity FROM sale_order_item WHERE sale_order_no = ?";
-			ps = dba.prepareStatement(sql);
-			ps.setString(1, saleOrderNo);
-			rs = ps.executeQuery();
-			while (rs.next()) {
-				result.merge(rs.getString("product_code"), rs.getInt("quantity"), Integer::sum);
-			}
-			return result;
-		} catch (SQLException e) {
-			throw new DBException(e);
-		} finally {
-			closeQuietly(rs, ps);
 		}
 	}
 

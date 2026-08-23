@@ -23,6 +23,7 @@ import fafoshop.common.utility.SeqNoUtility;
 import fafoshop.pos.inboundreceipt.dto.InboundReceiptCreateRequest;
 import fafoshop.pos.inboundreceipt.dto.InboundReceiptCreateResponse;
 import fafoshop.pos.inboundreceipt.dto.InboundReceiptItemDto;
+import fafoshop.pos.stock.process.StockLotHelper;
 
 /**
  * Tạo phiếu nhập hàng (màn hình Nhập hàng - quét liên tục kiểu POS, xem trao
@@ -387,41 +388,10 @@ public class InboundReceiptCreateProcess extends AbstractProcess {
 	 * từ thiết kế bảng stock, không phải phát sinh mới ở Process này.
 	 */
 	private void upsertStock(DBAccessor dba, String branchCode, List<InboundReceiptItemDto> items,
-			List<Date> expiryDates, String userCode) throws DBException {
-
-		DBStatement ps = null;
-		try {
-			String sql = "INSERT INTO stock "
-					+ "(branch_code, product_code, quality_code, expiry_date, stock_qty, available_qty, "
-					+ " entry_user_code, entry_program, update_user_code, update_program) "
-					+ "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-					+ "ON DUPLICATE KEY UPDATE "
-					+ "stock_qty = stock_qty + VALUES(stock_qty), "
-					+ "available_qty = available_qty + VALUES(available_qty), "
-					+ "expiry_date = VALUES(expiry_date), "
-					+ "update_user_code = VALUES(update_user_code), "
-					+ "update_program = VALUES(update_program)";
-
-			ps = dba.prepareStatement(sql);
-			for (int i = 0; i < items.size(); i++) {
-				InboundReceiptItemDto item = items.get(i);
-
-				ps.setString(1, branchCode);
-				ps.setString(2, item.productCode);
-				ps.setString(3, DEFAULT_QUALITY_CODE);
-				ps.setDate(4, expiryDates.get(i));
-				ps.setInt(5, item.quantity);
-				ps.setInt(6, item.quantity);
-				ps.setString(7, userCode);
-				ps.setString(8, PRG_CD);
-				ps.setString(9, userCode);
-				ps.setString(10, PRG_CD);
-				ps.executeUpdate();
-			}
-		} finally {
-			if (ps != null) {
-				ps.close();
-			}
+			List<Date> expiryDates, String userCode) throws DBException, FatalException {
+		for (int i = 0; i < items.size(); i++) {
+			StockLotHelper.applyDeltaByExpiry(dba, branchCode, items.get(i).productCode, expiryDates.get(i),
+					items.get(i).quantity, userCode, PRG_CD);
 		}
 	}
 

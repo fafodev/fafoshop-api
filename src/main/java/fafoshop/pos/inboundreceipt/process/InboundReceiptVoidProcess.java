@@ -1,5 +1,6 @@
 package fafoshop.pos.inboundreceipt.process;
 
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -56,13 +57,29 @@ public class InboundReceiptVoidProcess extends AbstractProcess {
 
 		String branchCode = InboundReceiptEditGuard.resolveEligibleBranchCode(dba, req.receiptNo, req.accessInfo.userCode);
 
-		Map<String, Integer> quantities = queryCurrentQuantities(dba, branchCode, req.receiptNo);
-		// Hoàn tác toàn bộ = delta ÂM đúng bằng số lượng gốc (trừ lại hết, floor 0).
-		Map<String, Integer> delta = new HashMap<>();
-		for (Map.Entry<String, Integer> e : quantities.entrySet()) {
-			delta.put(e.getKey(), -e.getValue());
+		Map<String, Integer> deltaByLotKey = new HashMap<>();
+		Map<String, String> productByLotKey = new HashMap<>();
+		Map<String, Date> expiryByLotKey = new HashMap<>();
+		ResultSet rs = null;
+		DBStatement ps = null;
+		try {
+			String sql = "SELECT product_code, expiry_date, actual_qty FROM inbound_receipt_item "
+					+ "WHERE branch_code = ? AND receipt_no = ?";
+			ps = dba.prepareStatement(sql);
+			ps.setString(1, branchCode);
+			ps.setString(2, req.receiptNo);
+			rs = ps.executeQuery();
+			while (rs.next()) {
+				InboundReceiptStockAdjuster.acc(deltaByLotKey, productByLotKey, expiryByLotKey,
+						rs.getString("product_code"), rs.getDate("expiry_date"), -rs.getInt("actual_qty"));
+			}
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			closeQuietly(rs, ps);
 		}
-		InboundReceiptStockAdjuster.applyDelta(dba, branchCode, delta, req.accessInfo.userCode, PRG_CD);
+		InboundReceiptStockAdjuster.applyDelta(dba, branchCode, deltaByLotKey, productByLotKey, expiryByLotKey,
+				req.accessInfo.userCode, PRG_CD);
 
 		markVoid(dba, branchCode, req.receiptNo, req.accessInfo.userCode);
 
@@ -73,29 +90,6 @@ public class InboundReceiptVoidProcess extends AbstractProcess {
 	private void validateReceiptNo(String receiptNo) throws ProcessCheckErrorException {
 		if (receiptNo == null || receiptNo.trim().isEmpty()) {
 			throwError("ME000125");
-		}
-	}
-
-	private Map<String, Integer> queryCurrentQuantities(DBAccessor dba, String branchCode, String receiptNo)
-			throws DBException {
-		Map<String, Integer> result = new HashMap<>();
-		ResultSet rs = null;
-		DBStatement ps = null;
-		try {
-			String sql = "SELECT product_code, actual_qty FROM inbound_receipt_item "
-					+ "WHERE branch_code = ? AND receipt_no = ?";
-			ps = dba.prepareStatement(sql);
-			ps.setString(1, branchCode);
-			ps.setString(2, receiptNo);
-			rs = ps.executeQuery();
-			while (rs.next()) {
-				result.merge(rs.getString("product_code"), rs.getInt("actual_qty"), Integer::sum);
-			}
-			return result;
-		} catch (SQLException e) {
-			throw new DBException(e);
-		} finally {
-			closeQuietly(rs, ps);
 		}
 	}
 

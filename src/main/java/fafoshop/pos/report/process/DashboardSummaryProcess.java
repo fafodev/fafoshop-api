@@ -336,12 +336,13 @@ public class DashboardSummaryProcess extends AbstractProcess {
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
-			String sql = "SELECT s.product_code, p.name, s.stock_qty, p.min_stock_qty "
+			String sql = "SELECT s.product_code, p.name, SUM(s.stock_qty) AS stock_qty, p.min_stock_qty "
 					+ "FROM stock s "
 					+ "JOIN product p ON p.product_code = s.product_code "
 					+ "WHERE s.branch_code = ? AND p.del_flg = '0' AND p.min_stock_qty > 0 "
-					+ "AND s.stock_qty <= p.min_stock_qty "
-					+ "ORDER BY (p.min_stock_qty - s.stock_qty) DESC "
+					+ "GROUP BY s.product_code, p.name, p.min_stock_qty "
+					+ "HAVING SUM(s.stock_qty) <= p.min_stock_qty "
+					+ "ORDER BY (p.min_stock_qty - SUM(s.stock_qty)) DESC "
 					+ "LIMIT 5";
 			ps = dba.prepareStatement(sql);
 			ps.setString(1, branchCode);
@@ -367,9 +368,8 @@ public class DashboardSummaryProcess extends AbstractProcess {
 	/**
 	 * Sản phẩm có hạn dùng (stock.expiry_date) trong vòng
 	 * product.expiry_warning_days ngày tới (kể cả đã quá hạn — vẫn cảnh báo
-	 * gấp hơn, xem ExpiringStockRowDto.daysRemaining có thể âm). LƯU Ý theo
-	 * đúng giới hạn thiết kế bảng stock (xem retail-domain.md): expiry_date bị
-	 * ghi đè bằng lô nhập gần nhất, không phải theo dõi từng lô riêng.
+	 * gấp hơn, xem ExpiringStockRowDto.daysRemaining có thể âm). Mỗi dòng
+	 * stock là 1 lô hạn dùng (docs/pos-lo-ton-kho.md).
 	 */
 	private List<ExpiringStockRowDto> queryExpiringStock(DBAccessor dba, String branchCode, LocalDate today)
 			throws DBException {

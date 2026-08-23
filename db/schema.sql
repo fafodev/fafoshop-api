@@ -240,15 +240,17 @@ CREATE TABLE hkd_info (
 );
 
 -- ----------------------------------------------------------------------------
--- stock — theo dõi tồn kho theo (branch_code, product_code), không theo dõi
--- vị trí kho vật lý chi tiết (đơn giản hoá cho quy mô 1 cửa hàng nhỏ).
+-- stock — tồn kho theo LÔ (mỗi dòng 1 stock_code tự sinh prefix IS). Một
+-- sản phẩm/chi nhánh có thể nhiều dòng khác hạn dùng. quality_code chưa
+-- đưa vào khoá (luôn '01' cho tới khi có màn phẩm cấp). Xem docs/pos-lo-ton-kho.md.
 -- ----------------------------------------------------------------------------
 CREATE TABLE stock (
-  branch_code      VARCHAR(6)    NOT NULL COMMENT 'Mã chi nhánh (một phần khoá chính)',
-  product_code     VARCHAR(100)  NOT NULL COMMENT 'Mã sản phẩm (một phần khoá chính)',
-  quality_code     VARCHAR(2)    NOT NULL DEFAULT '01' COMMENT 'Mã phẩm cấp/tình trạng hàng (01=hàng thường)',
-  expiry_date      DATE          NULL COMMENT 'Hạn sử dụng (nếu có)',
-  stock_qty        INT(9)        NOT NULL DEFAULT 0 COMMENT 'Số lượng tồn kho thực tế',
+  stock_code       VARCHAR(20)   NOT NULL COMMENT 'Mã lô tồn kho (khoá chính) - tự sinh dạng IS+yyyyMMdd+4 số (seq_no prefix IS)',
+  branch_code      VARCHAR(6)    NOT NULL COMMENT 'Mã chi nhánh',
+  product_code     VARCHAR(100)  NOT NULL COMMENT 'Mã sản phẩm',
+  quality_code     VARCHAR(2)    NOT NULL DEFAULT '01' COMMENT 'Mã phẩm cấp/tình trạng hàng (01=hàng thường) - chưa dùng làm khoá',
+  expiry_date      DATE          NULL COMMENT 'Hạn sử dụng của lô (nếu có). NULL = không hạn dùng',
+  stock_qty        INT(9)        NOT NULL DEFAULT 0 COMMENT 'Số lượng tồn kho thực tế (đơn vị lẻ)',
   available_qty    INT(9)        NOT NULL DEFAULT 0 COMMENT 'Số lượng tồn khả dụng (có thể bán)',
   entry_user_code  VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
   entry_datetime   TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
@@ -256,7 +258,8 @@ CREATE TABLE stock (
   update_user_code VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng cập nhật gần nhất',
   update_datetime  TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm cập nhật gần nhất',
   update_program   VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
-  PRIMARY KEY (branch_code, product_code),
+  PRIMARY KEY (stock_code),
+  KEY idx_stock_branch_product (branch_code, product_code),
   CONSTRAINT fk_stock_branch FOREIGN KEY (branch_code) REFERENCES branch (branch_code),
   CONSTRAINT fk_stock_product FOREIGN KEY (product_code) REFERENCES product (product_code)
 );
@@ -453,6 +456,8 @@ CREATE TABLE sale_order_item (
   sale_order_no    VARCHAR(20)   NOT NULL COMMENT 'Số đơn bán hàng (một phần khoá chính, tham chiếu đơn bán)',
   line_no          INT(3)        NOT NULL COMMENT 'Số thứ tự dòng trong đơn bán (một phần khoá chính)',
   product_code     VARCHAR(100)  NOT NULL COMMENT 'Mã sản phẩm',
+  stock_code       VARCHAR(20)   NULL COMMENT 'Mã lô tồn kho đã trừ lúc bán (stock.stock_code). NULL = đơn tạo trước khi theo dõi lô',
+  expiry_date      DATE          NULL COMMENT 'Hạn dùng của lô đã chọn lúc bán (chụp lại). NULL = không hạn / đơn cũ',
   unit_price       DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'Đơn giá bán tại thời điểm giao dịch',
   quantity         INT(9)        NOT NULL DEFAULT 1 COMMENT 'Số lượng bán',
   line_amount      DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT 'Thành tiền của dòng (đơn giá × số lượng)',

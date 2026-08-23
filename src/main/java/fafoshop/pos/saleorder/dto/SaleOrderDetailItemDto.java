@@ -31,4 +31,8 @@ public class SaleOrderDetailItemDto extends AbstractDto {
 
 	/** Số lượng theo ĐÚNG đơn vị đã chọn — NULL khi `unitName` NULL. NULLABLE, xem Javadoc `unitName`. */
 	public Integer unitQty;
+
+	public String stockCode;
+	/** yyyy-MM-dd — nullable. */
+	public String expiryDate;
 }

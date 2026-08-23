@@ -76,21 +76,17 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 
 		String branchCode = InboundReceiptEditGuard.resolveEligibleBranchCode(dba, req.receiptNo, req.accessInfo.userCode);
 
-		Map<String, Integer> oldQtyByProduct = queryCurrentQuantities(dba, branchCode, req.receiptNo);
-		Map<String, Integer> newQtyByProduct = new HashMap<>();
-		for (InboundReceiptItemDto item : req.items) {
-			newQtyByProduct.merge(item.productCode, item.quantity, Integer::sum);
+		Map<String, Integer> deltaByLotKey = new HashMap<>();
+		Map<String, String> productByLotKey = new HashMap<>();
+		Map<String, Date> expiryByLotKey = new HashMap<>();
+		accCurrentInboundLots(dba, branchCode, req.receiptNo, -1, deltaByLotKey, productByLotKey, expiryByLotKey);
+		for (int i = 0; i < req.items.size(); i++) {
+			InboundReceiptStockAdjuster.acc(deltaByLotKey, productByLotKey, expiryByLotKey,
+					req.items.get(i).productCode, expiryDates.get(i), req.items.get(i).quantity);
 		}
 
-		Map<String, Integer> delta = new HashMap<>();
-		for (Map.Entry<String, Integer> e : newQtyByProduct.entrySet()) {
-			delta.merge(e.getKey(), e.getValue(), Integer::sum);
-		}
-		for (Map.Entry<String, Integer> e : oldQtyByProduct.entrySet()) {
-			delta.merge(e.getKey(), -e.getValue(), Integer::sum);
-		}
-
-		InboundReceiptStockAdjuster.applyDelta(dba, branchCode, delta, req.accessInfo.userCode, PRG_CD);
+		InboundReceiptStockAdjuster.applyDelta(dba, branchCode, deltaByLotKey, productByLotKey, expiryByLotKey,
+				req.accessInfo.userCode, PRG_CD);
 
 		updateHeader(dba, req, branchCode, einvoiceIssueDate, req.accessInfo.userCode);
 		replaceItems(dba, req.receiptNo, branchCode, req.items, expiryDates, req.accessInfo.userCode);
@@ -245,22 +241,22 @@ public class InboundReceiptUpdateProcess extends AbstractProcess {
 		}
 	}
 
-	private Map<String, Integer> queryCurrentQuantities(DBAccessor dba, String branchCode, String receiptNo)
+	private void accCurrentInboundLots(DBAccessor dba, String branchCode, String receiptNo, int sign,
+			Map<String, Integer> deltaByLotKey, Map<String, String> productByLotKey, Map<String, Date> expiryByLotKey)
 			throws DBException {
-		Map<String, Integer> result = new HashMap<>();
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
-			String sql = "SELECT product_code, actual_qty FROM inbound_receipt_item "
+			String sql = "SELECT product_code, expiry_date, actual_qty FROM inbound_receipt_item "
 					+ "WHERE branch_code = ? AND receipt_no = ?";
 			ps = dba.prepareStatement(sql);
 			ps.setString(1, branchCode);
 			ps.setString(2, receiptNo);
 			rs = ps.executeQuery();
 			while (rs.next()) {
-				result.merge(rs.getString("product_code"), rs.getInt("actual_qty"), Integer::sum);
+				InboundReceiptStockAdjuster.acc(deltaByLotKey, productByLotKey, expiryByLotKey,
+						rs.getString("product_code"), rs.getDate("expiry_date"), sign * rs.getInt("actual_qty"));
 			}
-			return result;
 		} catch (SQLException e) {
 			throw new DBException(e);
 		} finally {
