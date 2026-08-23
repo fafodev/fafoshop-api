@@ -1,6 +1,7 @@
 package fafoshop.pos.saleorder.process;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -135,7 +136,16 @@ public class SaleOrderDetailProcess extends AbstractProcess {
 				Date expiry = rs.getDate("expiry_date");
 				item.expiryDate = expiry == null ? null : expiry.toString();
 				if (item.unitCost != null) {
-					item.lineProfit = item.lineAmount.subtract(item.unitCost.multiply(BigDecimal.valueOf(item.quantity)));
+					// Làm tròn NGAY về đồng nguyên (VNĐ không có số lẻ) khi hiển thị —
+					// unit_cost snapshot có thể mang 2 chữ số thập phân nếu quy đổi
+					// từ giá vốn đơn vị đóng gói (vd 28.000đ/Lốc x6 -> 4.666,67đ/cái,
+					// xem SaleOrderCreateProcess.resolveUnitCost), khiến "Lãi" thô
+					// (chưa làm tròn) ra số có xu lẻ (vd 33.999,96đ thay vì 34.000đ).
+					// Cộng tổng TRÊN GIÁ TRỊ ĐÃ LÀM TRÒN để tổng luôn khớp đúng bằng
+					// tổng các dòng NGƯỜI DÙNG NHÌN THẤY, không lệch do cộng số thô
+					// rồi mới làm tròn tổng.
+					item.lineProfit = item.lineAmount.subtract(item.unitCost.multiply(BigDecimal.valueOf(item.quantity)))
+							.setScale(0, RoundingMode.HALF_UP);
 					profitAmount = profitAmount.add(item.lineProfit);
 				} else {
 					hasUnknownCost = true; // sản phẩm dòng này chưa từng có phiếu nhập lúc bán — không tính được lãi TOÀN đơn

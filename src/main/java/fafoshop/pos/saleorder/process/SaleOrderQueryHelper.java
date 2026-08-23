@@ -45,9 +45,19 @@ final class SaleOrderQueryHelper {
 	 * xem SaleOrderCreateProcess.queryWeightedAvgUnitCost), để KHÔNG hiển thị
 	 * lãi sai (thiếu 1 phần chi phí) mà không cảnh báo — tốt hơn cho người
 	 * dùng biết "chưa xác định" thay vì con số sai lệch.
+	 *
+	 * ROUND(..., 0) NGAY trong SUM — unit_cost snapshot có thể mang 2 chữ số
+	 * thập phân nếu quy đổi từ giá vốn đơn vị đóng gói (vd 28.000đ/Lốc x6 ->
+	 * 4.666,67đ/cái, xem SaleOrderCreateProcess.resolveUnitCost), khiến "Tiền
+	 * lãi" thô ra số có xu lẻ (vd 33.999,96đ thay vì 34.000đ) — VNĐ không có
+	 * số lẻ trong giao dịch thực tế. Làm tròn TỪNG ĐƠN ở đây (không phải sau
+	 * khi SUM nhiều đơn ở SaleOrderSearchProcess.queryProfitSummary) để tổng
+	 * lãi cộng dồn nhiều đơn luôn khớp đúng bằng tổng các số ĐÃ LÀM TRÒN
+	 * người dùng nhìn thấy trên từng dòng, cùng nguyên tắc với
+	 * SaleOrderDetailProcess.queryItems (làm tròn từng dòng trước khi cộng).
 	 */
 	static final String PROFIT_SUBQUERY_SQL = "(SELECT CASE WHEN SUM(CASE WHEN soi3.unit_cost IS NULL THEN 1 ELSE 0 END) > 0 "
-			+ "THEN NULL ELSE SUM(soi3.line_amount - soi3.unit_cost * soi3.quantity) END "
+			+ "THEN NULL ELSE ROUND(SUM(soi3.line_amount - soi3.unit_cost * soi3.quantity), 0) END "
 			+ "FROM sale_order_item soi3 WHERE soi3.sale_order_no = so.sale_order_no)";
 
 	/**

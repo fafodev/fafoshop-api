@@ -197,8 +197,15 @@ public class DashboardSummaryProcess extends AbstractProcess {
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
+			// total_value PHẢI cộng theo COALESCE(line_amount, actual_qty *
+			// unit_cost), KHÔNG được nhân thẳng actual_qty * unit_cost — dòng
+			// nhập qua đơn vị đóng gói (Lốc/Thùng) không chia hết ra lẻ có
+			// unit_cost đã làm tròn 1 lần, nhân lại lệch vài đồng so với
+			// line_amount (Thành tiền THẬT đã lưu). Cùng bug/cùng fix với
+			// InboundReceiptQueryHelper.SELECT_COLUMNS_SQL — bug thật phát
+			// hiện lúc test: ô "Nhập hàng hôm nay" lệch 4đ so với tổng thật.
 			String sql = "SELECT COUNT(DISTINCT ir.receipt_no) AS receipt_count, "
-					+ "COALESCE(SUM(iri.actual_qty * iri.unit_cost), 0) AS total_value "
+					+ "COALESCE(SUM(COALESCE(iri.line_amount, iri.actual_qty * iri.unit_cost)), 0) AS total_value "
 					+ "FROM inbound_receipt ir "
 					+ "JOIN inbound_receipt_item iri ON iri.branch_code = ir.branch_code AND iri.receipt_no = ir.receipt_no "
 					+ "WHERE ir.branch_code = ? AND ir.receipt_date = ? AND ir.del_flg = '0'";

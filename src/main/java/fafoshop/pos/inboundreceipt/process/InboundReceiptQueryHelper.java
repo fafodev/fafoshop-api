@@ -34,10 +34,21 @@ final class InboundReceiptQueryHelper {
 	 * total_amount/item_count lấy qua SUBQUERY vô hướng (không phải JOIN
 	 * thường) — 1 phiếu nhập có NHIỀU dòng hàng, JOIN thường sẽ nhân dòng và
 	 * làm sai COUNT(*)/phân trang, cùng kỹ thuật SaleOrderQueryHelper.
+	 *
+	 * total_amount PHẢI cộng theo `COALESCE(line_amount, unit_cost *
+	 * actual_qty)`, KHÔNG được nhân thẳng `unit_cost * actual_qty` — dòng
+	 * nhập qua đơn vị đóng gói (Lốc/Thùng) không chia hết ra lẻ có
+	 * `unit_cost` đã làm tròn 1 lần, nhân lại lệch vài đồng so với
+	 * `line_amount` (Thành tiền THẬT đã lưu, xem comment cột trong
+	 * db/schema.sql). Bug thật phát hiện lúc test: phiếu 2 Lốc x 28.000đ
+	 * (28.000/6 lẻ) hiện đúng 56.000đ ở Chi tiết phiếu (dùng line_amount qua
+	 * InboundReceiptDetailProcess) nhưng lại hiện 56.004đ ở danh sách này
+	 * (trước khi sửa, do nhân thẳng unit_cost đã làm tròn 4.667đ/cái × 12).
 	 */
 	static final String SELECT_COLUMNS_SQL = "ir.receipt_no, ir.branch_code, ir.supplier_code, s.name AS supplier_name, "
 			+ "ir.receipt_date, ir.note, ir.receipt_user_code, u.name AS receipt_user_name, ir.void_flg, "
-			+ "(SELECT COALESCE(SUM(iri2.unit_cost * iri2.actual_qty), 0) FROM inbound_receipt_item iri2 "
+			+ "(SELECT COALESCE(SUM(COALESCE(iri2.line_amount, iri2.unit_cost * iri2.actual_qty)), 0) "
+			+ " FROM inbound_receipt_item iri2 "
 			+ " WHERE iri2.branch_code = ir.branch_code AND iri2.receipt_no = ir.receipt_no) AS total_amount, "
 			+ "(SELECT COUNT(*) FROM inbound_receipt_item iri2 "
 			+ " WHERE iri2.branch_code = ir.branch_code AND iri2.receipt_no = ir.receipt_no) AS item_count ";

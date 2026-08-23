@@ -76,12 +76,22 @@ public class InboundReceiptSearchProcess extends AbstractProcess {
 		}
 	}
 
-	/** Tổng tiền nhập CỘNG DỒN toàn bộ kết quả khớp filter — JOIN thêm inbound_receipt_item, mirror SaleOrderSearchProcess.querySumTotalAmount. */
+	/**
+	 * Tổng tiền nhập CỘNG DỒN toàn bộ kết quả khớp filter — JOIN thêm
+	 * inbound_receipt_item, mirror SaleOrderSearchProcess.querySumTotalAmount.
+	 *
+	 * PHẢI cộng theo `COALESCE(line_amount, unit_cost * actual_qty)`, cùng
+	 * lý do/cùng bug đã sửa ở InboundReceiptQueryHelper.SELECT_COLUMNS_SQL —
+	 * đây là CHỖ THỨ 3 tính tổng tiền nhập độc lập với 2 chỗ kia (cột
+	 * totalAmount từng dòng + Dashboard), bị sót lúc soát lại lần đầu vì
+	 * nằm ở query riêng cho "Tổng tiền nhập" cộng dồn toàn bộ kết quả lọc,
+	 * không phải từng dòng.
+	 */
 	private BigDecimal querySumTotalAmount(DBAccessor dba, String where, List<String> params) throws DBException {
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
-			String sql = "SELECT COALESCE(SUM(iri.unit_cost * iri.actual_qty), 0) AS sum_amount "
+			String sql = "SELECT COALESCE(SUM(COALESCE(iri.line_amount, iri.unit_cost * iri.actual_qty)), 0) AS sum_amount "
 					+ InboundReceiptQueryHelper.FROM_JOIN_SQL
 					+ "LEFT JOIN inbound_receipt_item iri ON iri.branch_code = ir.branch_code AND iri.receipt_no = ir.receipt_no "
 					+ where;
