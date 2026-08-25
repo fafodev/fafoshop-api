@@ -88,7 +88,8 @@ VALUES
   ('INBND_EDIT', 'Sửa/huỷ phiếu nhập (tự tạo, 15 phút)', 'Sửa phiếu nhập', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('INBND_MGR', 'QL sửa/huỷ phiếu nhập (không giới hạn)', 'QL phiếu nhập', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
   ('RPT_VIEW', 'Xem tổng quan/báo cáo', 'Tổng quan', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
-  ('STK_EDIT', 'Kiểm kê tồn kho', 'Kiểm kê', '1', '1', '0', 'system', 'SEED', 'system', 'SEED')
+  ('STK_EDIT', 'Kiểm kê tồn kho', 'Kiểm kê', '1', '1', '0', 'system', 'SEED', 'system', 'SEED'),
+  ('FRPR_VIEW', 'In nhãn tự do', 'In tự do', '1', '1', '0', 'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
 INSERT INTO app_user
@@ -121,7 +122,8 @@ VALUES
   ('admin', 'INBND_EDIT', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'INBND_MGR', '1', 'system', 'SEED', 'system', 'SEED'),
   ('admin', 'RPT_VIEW', '1', 'system', 'SEED', 'system', 'SEED'),
-  ('admin', 'STK_EDIT', '1', 'system', 'SEED', 'system', 'SEED')
+  ('admin', 'STK_EDIT', '1', 'system', 'SEED', 'system', 'SEED'),
+  ('admin', 'FRPR_VIEW', '1', 'system', 'SEED', 'system', 'SEED')
 ON DUPLICATE KEY UPDATE auth_type = VALUES(auth_type);
 
 INSERT INTO category
