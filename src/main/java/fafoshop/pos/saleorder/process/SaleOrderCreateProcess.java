@@ -11,6 +11,7 @@ import java.util.List;
 
 import fafoshop.common.ConstantValue;
 import fafoshop.common.ILogSender;
+import fafoshop.common.LogLevel;
 import fafoshop.common.database.DBAccessor;
 import fafoshop.common.database.DBStatement;
 import fafoshop.common.dto.ErrorDto;
@@ -64,6 +65,15 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		SaleOrderCreateRequest req = (SaleOrderCreateRequest) request;
 		SaleOrderCreateResponse res = (SaleOrderCreateResponse) response;
 
+		// Chống ghi trùng — kiểm tra TRƯỚC mọi validate khác: request lặp lại
+		// của 1 đơn đã ghi nhận phải trả đúng đơn cũ, kể cả khi dữ liệu nghiệp
+		// vụ đã đổi sau đó (vd sản phẩm vừa bị xoá) khiến validate lại sẽ lỗi.
+		String idempotencyKey = normalizeIdempotencyKey(req.idempotencyKey);
+		if (idempotencyKey != null && replayExistingOrder(dba, idempotencyKey, req.accessInfo.userCode, res)) {
+			logSend(LogLevel.INFOMATION, "Idempotency:Replay saleOrderNo=" + res.saleOrderNo);
+			return res;
+		}
+
 		validateItems(req.items);
 		validatePaymentMethod(req.paymentMethod);
 
@@ -78,22 +88,92 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 		String branchCode = getCashierBranchCode(dba, req.accessInfo.userCode);
 		BigDecimal changeAmount = req.paidAmount.subtract(subtotal);
 
-		String saleOrderNo = SeqNoUtility.generate(dba, SEQ_PREFIX, req.accessInfo.userCode, PRG_CD);
-		Timestamp now = new Timestamp(System.currentTimeMillis());
-
-		insertSaleOrder(dba, saleOrderNo, branchCode, req.customerName, now, req.paidAmount, changeAmount,
-				req.paymentMethod, req.accessInfo.userCode);
+		// Chọn lô TRƯỚC khi sinh số đơn/INSERT header — resolveStockCodeForSale
+		// có thể ném lỗi nghiệp vụ (ME000138/ME000139), mà lỗi nghiệp vụ loại
+		// NORMAL vẫn được AbstractProcess COMMIT. Trước đây bước này nằm SAU
+		// insertSaleOrder nên lỗi ở đây để lại 1 header sale_order không có
+		// dòng hàng nào (đơn 0đ ma) + tốn 1 số hoá đơn.
 		for (SaleOrderItemDto item : req.items) {
 			item.stockCode = StockLotHelper.resolveStockCodeForSale(dba, branchCode, item.productCode, item.stockCode,
 					req.accessInfo.userCode, PRG_CD);
 		}
+
+		String saleOrderNo = SeqNoUtility.generate(dba, SEQ_PREFIX, req.accessInfo.userCode, PRG_CD);
+		Timestamp now = new Timestamp(System.currentTimeMillis());
+
+		insertSaleOrder(dba, saleOrderNo, branchCode, req.customerName, now, req.paidAmount, changeAmount,
+				req.paymentMethod, req.accessInfo.userCode, idempotencyKey);
 		insertSaleOrderItems(dba, saleOrderNo, branchCode, req.items, req.accessInfo.userCode);
 		decrementStock(dba, req.items, req.accessInfo.userCode);
 
 		res.saleOrderNo = saleOrderNo;
 		res.subtotal = subtotal;
 		res.changeAmount = changeAmount;
+		res.duplicate = false;
 		return res;
+	}
+
+	/**
+	 * Rỗng/null → null (client cũ không gửi khoá, không chống trùng). Có giá
+	 * trị thì CHỈ nhận chữ/số/gạch nối 8–64 ký tự (UUID 36 ký tự nằm gọn) —
+	 * sai định dạng là lỗi nghiệp vụ, không âm thầm bỏ qua (bỏ qua = mất chống
+	 * trùng mà không ai biết).
+	 */
+	private String normalizeIdempotencyKey(String raw) throws ProcessCheckErrorException {
+		if (raw == null || raw.trim().isEmpty()) {
+			return null;
+		}
+		String key = raw.trim();
+		if (!key.matches("[A-Za-z0-9-]{8,64}")) {
+			throwError("ME000142");
+		}
+		return key;
+	}
+
+	/**
+	 * Tìm đơn đã tạo với cùng khoá — nếu có thì điền response bằng ĐÚNG số
+	 * liệu đơn cũ (đọc lại từ DB, không tin số request lần này) và trả true.
+	 *
+	 * `FOR UPDATE` là locking read: (1) luôn đọc bản ĐÃ COMMIT mới nhất, không
+	 * bị snapshot REPEATABLE READ che mất đơn vừa được request song song
+	 * commit; (2) khi CHƯA có dòng nào, InnoDB khoá khoảng (gap lock) trên
+	 * index UNIQUE — 2 request trùng khoá chạy song song sẽ tắc nhau thành
+	 * deadlock (1213) ở bước INSERT, AbstractProcess tự rollback + retry, lần
+	 * retry thấy đơn đã commit và trả lại đơn đó. UNIQUE KEY
+	 * uk_saleorder_idempotency_key là chốt chặn cuối nếu vẫn lọt.
+	 *
+	 * Khoá khớp nhưng do USER KHÁC tạo → lỗi, KHÔNG trả thông tin đơn của
+	 * người khác (khoá ngẫu nhiên nên trùng thật gần như không thể, trùng tức
+	 * là client bất thường).
+	 */
+	private boolean replayExistingOrder(DBAccessor dba, String idempotencyKey, String userCode,
+			SaleOrderCreateResponse res) throws DBException, ProcessCheckErrorException {
+		ResultSet rs = null;
+		DBStatement ps = null;
+		try {
+			String sql = "SELECT so.sale_order_no, so.entry_user_code, so.change_amount, "
+					+ "(SELECT COALESCE(SUM(soi.line_amount), 0) FROM sale_order_item soi "
+					+ " WHERE soi.sale_order_no = so.sale_order_no) AS subtotal "
+					+ "FROM sale_order so WHERE so.idempotency_key = ? FOR UPDATE";
+			ps = dba.prepareStatement(sql);
+			ps.setString(1, idempotencyKey);
+			rs = ps.executeQuery();
+			if (!rs.next()) {
+				return false;
+			}
+			if (!userCode.equals(rs.getString("entry_user_code"))) {
+				throwError("ME000143");
+			}
+			res.saleOrderNo = rs.getString("sale_order_no");
+			res.subtotal = rs.getBigDecimal("subtotal");
+			res.changeAmount = rs.getBigDecimal("change_amount");
+			res.duplicate = true;
+			return true;
+		} catch (SQLException e) {
+			throw new DBException(e);
+		} finally {
+			closeQuietly(rs, ps);
+		}
 	}
 
 	private void validateItems(List<SaleOrderItemDto> items) throws ProcessCheckErrorException {
@@ -201,16 +281,16 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 
 	private void insertSaleOrder(DBAccessor dba, String saleOrderNo, String branchCode, String customerName,
 			Timestamp saleDatetime, BigDecimal paidAmount, BigDecimal changeAmount, String paymentMethod,
-			String userCode) throws DBException {
+			String userCode, String idempotencyKey) throws DBException {
 
 		DBStatement ps = null;
 		try {
 			StringBuilder sql = new StringBuilder();
 			sql.append("INSERT INTO sale_order ");
 			sql.append("(sale_order_no, branch_code, customer_code, customer_name, sale_datetime, ");
-			sql.append(" paid_amount, change_amount, payment_method, cashier_user_code, void_flg, ");
+			sql.append(" paid_amount, change_amount, payment_method, cashier_user_code, void_flg, idempotency_key, ");
 			sql.append(" entry_user_code, entry_program, update_user_code, update_program) ");
-			sql.append("VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, '0', ?, ?, ?, ?)");
+			sql.append("VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, '0', ?, ?, ?, ?, ?)");
 
 			ps = dba.prepareStatement(sql);
 			ps.setString(1, saleOrderNo);
@@ -221,10 +301,11 @@ public class SaleOrderCreateProcess extends AbstractProcess {
 			ps.setBigDecimal(6, changeAmount);
 			ps.setString(7, paymentMethod);
 			ps.setString(8, userCode);
-			ps.setString(9, userCode);
-			ps.setString(10, PRG_CD);
-			ps.setString(11, userCode);
-			ps.setString(12, PRG_CD);
+			ps.setString(9, idempotencyKey);
+			ps.setString(10, userCode);
+			ps.setString(11, PRG_CD);
+			ps.setString(12, userCode);
+			ps.setString(13, PRG_CD);
 			ps.executeUpdate();
 		} finally {
 			if (ps != null) {

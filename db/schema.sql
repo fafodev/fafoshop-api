@@ -441,6 +441,7 @@ CREATE TABLE sale_order (
   payment_method    VARCHAR(10)   NOT NULL DEFAULT 'CASH' COMMENT 'Phương thức thanh toán: CASH=tiền mặt, TRANSFER=chuyển khoản',
   cashier_user_code VARCHAR(8)    NOT NULL COMMENT 'Mã thu ngân thực hiện đơn',
   void_flg          VARCHAR(1)    NOT NULL DEFAULT '0' COMMENT 'Cờ đơn bị huỷ (thay cho xoá cứng): 1=đã huỷ, 0=còn hiệu lực',
+  idempotency_key   VARCHAR(64)   NULL COMMENT 'Khoá chống ghi trùng do POS gửi kèm mỗi lần thanh toán (UUID) — gặp lại khoá thì trả đơn cũ, không tạo đơn mới',
   entry_user_code   VARCHAR(8)    NOT NULL COMMENT 'Mã người dùng tạo bản ghi',
   entry_datetime    TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm tạo bản ghi',
   entry_program     VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình tạo bản ghi',
@@ -448,6 +449,7 @@ CREATE TABLE sale_order (
   update_datetime   TIMESTAMP(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT 'Thời điểm cập nhật gần nhất',
   update_program    VARCHAR(10)   NOT NULL COMMENT 'Mã chương trình cập nhật gần nhất',
   PRIMARY KEY (sale_order_no),
+  UNIQUE KEY uk_saleorder_idempotency_key (idempotency_key),
   CONSTRAINT fk_saleorder_branch FOREIGN KEY (branch_code) REFERENCES branch (branch_code),
   CONSTRAINT fk_saleorder_customer FOREIGN KEY (customer_code) REFERENCES customer (customer_code)
 );

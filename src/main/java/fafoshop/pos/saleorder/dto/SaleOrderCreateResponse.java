@@ -14,4 +14,11 @@ public class SaleOrderCreateResponse extends AbstractResponse {
 
 	/** Tiền thối lại = paidAmount - subtotal — server tính. */
 	public BigDecimal changeAmount;
+
+	/**
+	 * true = request này trùng idempotencyKey của 1 đơn ĐÃ tạo trước đó —
+	 * saleOrderNo/subtotal/changeAmount là của đơn cũ, KHÔNG tạo đơn mới.
+	 * false = vừa tạo đơn mới. Luôn có giá trị (không null).
+	 */
+	public boolean duplicate;
 }
