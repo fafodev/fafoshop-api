@@ -79,13 +79,24 @@ public class SaleOrderSearchProcess extends AbstractProcess {
 		}
 	}
 
-	/** Tổng tiền hàng CỘNG DỒN toàn bộ kết quả khớp filter — JOIN thêm sale_order_item (khác query đếm/lấy dòng, không cần subquery vì không phân trang theo dòng). */
+	/**
+	 * Điều kiện bổ sung CHỈ cho 2 query tổng tiền/tổng lãi: đơn đã huỷ
+	 * (void_flg='1') KHÔNG còn là doanh thu — kể cả khi bộ lọc trạng thái là
+	 * "Tất cả" (mặc định) hay "Đã huỷ". Danh sách/đếm số đơn vẫn theo đúng bộ
+	 * lọc (vẫn thấy đơn đã huỷ trong lưới), chỉ phần cộng dồn tiền loại ra —
+	 * đồng nhất với v_daily_revenue/v_item_revenue (màn Tổng quan) và
+	 * RevenueS1aExportProcess vốn đều đã lọc void_flg='0'.
+	 */
+	private static final String REVENUE_ONLY_SQL = "AND so.void_flg = '0' ";
+
+	/** Tổng tiền hàng CỘNG DỒN toàn bộ kết quả khớp filter (loại đơn đã huỷ, xem REVENUE_ONLY_SQL) — JOIN thêm sale_order_item (khác query đếm/lấy dòng, không cần subquery vì không phân trang theo dòng). */
 	private BigDecimal querySumTotalAmount(DBAccessor dba, String where, List<String> params) throws DBException {
 		ResultSet rs = null;
 		DBStatement ps = null;
 		try {
 			String sql = "SELECT COALESCE(SUM(soi.line_amount), 0) AS sum_amount " + SaleOrderQueryHelper.FROM_JOIN_SQL
-					+ "LEFT JOIN sale_order_item soi ON soi.sale_order_no = so.sale_order_no " + where;
+					+ "LEFT JOIN sale_order_item soi ON soi.sale_order_no = so.sale_order_no " + where
+					+ REVENUE_ONLY_SQL;
 			ps = dba.prepareStatement(sql);
 			SaleOrderQueryHelper.bindParams(ps, params);
 			rs = ps.executeQuery();
@@ -98,7 +109,7 @@ public class SaleOrderSearchProcess extends AbstractProcess {
 	}
 
 	/**
-	 * Tổng lãi cộng dồn CHỈ trên các đơn ĐÃ XÁC ĐỊNH đầy đủ giá vốn + đếm số
+	 * Tổng lãi cộng dồn CHỈ trên các đơn CÒN HIỆU LỰC (xem REVENUE_ONLY_SQL) VÀ ĐÃ XÁC ĐỊNH đầy đủ giá vốn + đếm số
 	 * đơn CHƯA xác định được (profit_amount NULL) — bọc PROFIT_SUBQUERY_SQL
 	 * (vốn là subquery vô hướng theo dòng) trong 1 bảng dẫn xuất (derived
 	 * table) để SUM/COUNT được trên kết quả đã tính theo từng đơn, KHÔNG được
@@ -112,7 +123,7 @@ public class SaleOrderSearchProcess extends AbstractProcess {
 			String sql = "SELECT COALESCE(SUM(t.profit_amount), 0) AS sum_profit, "
 					+ "SUM(CASE WHEN t.profit_amount IS NULL THEN 1 ELSE 0 END) AS unknown_count FROM ("
 					+ "SELECT " + SaleOrderQueryHelper.PROFIT_SUBQUERY_SQL + " AS profit_amount "
-					+ SaleOrderQueryHelper.FROM_JOIN_SQL + where + ") t";
+					+ SaleOrderQueryHelper.FROM_JOIN_SQL + where + REVENUE_ONLY_SQL + ") t";
 			ps = dba.prepareStatement(sql);
 			SaleOrderQueryHelper.bindParams(ps, params);
 			rs = ps.executeQuery();
