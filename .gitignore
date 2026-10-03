@@ -13,3 +13,6 @@
 # Log chay tay tren may dev (vd chay FafoshopApplication truc tiep khong qua
 # run-dev.ps1 luc debug) — may-cu-the, khong commit.
 *.log
+
+# File rac cua macOS (Finder tu sinh) - khong dua vao git
+.DS_Store
