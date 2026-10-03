@@ -29,7 +29,7 @@ import fafoshop.common.utility.MessageUtility;
  */
 final class SaleOrderEditGuard {
 
-	/** Số phút tối đa cho phép tự sửa/huỷ đơn MÌNH tạo, KHÔNG áp dụng nếu có SALE_MGR — mirror SaleOrderUpdatePaymentMethodProcess.EDIT_WINDOW_MINUTES. */
+	/** Số phút tối đa cho phép tự sửa/huỷ đơn MÌNH tạo, KHÔNG áp dụng nếu có SALE_MGR. (SaleOrderUpdatePaymentMethodProcess từng dùng chung quy tắc 15 phút này nhưng nay đã bỏ giới hạn thời gian, chỉ còn ràng buộc đúng người tạo.) */
 	private static final int EDIT_WINDOW_MINUTES = 15;
 
 	private static final String MGR_FUNC_ID = "SALE_MGR";

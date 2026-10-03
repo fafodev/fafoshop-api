@@ -20,25 +20,26 @@ import fafoshop.pos.saleorder.dto.SaleOrderUpdatePaymentMethodRequest;
 import fafoshop.pos.saleorder.dto.SaleOrderUpdatePaymentMethodResponse;
 
 /**
- * Sửa phương thức thanh toán của đơn bán VỪA TẠO (Phương án A trong
+ * Sửa phương thức thanh toán của đơn bán (Phương án A trong
  * docs/pos-in-hoa-don.md) — vd khách chọn chuyển khoản, đã in bill kèm QR,
- * nhưng đổi ý trả tiền mặt ngay tại quầy. Sửa THẲNG trên đơn cũ (không tạo
- * đơn mới) để báo cáo doanh thu không bị đúp; frontend tự in lại bill (không
- * QR nếu đổi sang CASH) và đánh dấu "BẢN IN THAY THẾ".
+ * nhưng đổi ý trả tiền mặt ngay tại quầy, hoặc đổi lại sau này ở màn Chi
+ * tiết đơn. Sửa THẲNG trên đơn cũ (không tạo đơn mới) để báo cáo doanh thu
+ * không bị đúp; frontend POS tự in lại bill (không QR nếu đổi sang CASH) và
+ * đánh dấu "BẢN IN THAY THẾ".
  *
- * Chỉ cho sửa khi ĐỦ CẢ 3 điều kiện (chống sửa bậy đơn cũ qua gọi API trực
- * tiếp, không phải thao tác thật tại quầy): đơn còn hiệu lực (void_flg='0'),
- * do ĐÚNG thu ngân đang đăng nhập tạo, và còn trong vòng 15 phút kể từ lúc
- * tạo. Không đạt 1 trong 3 → coi như "không tìm thấy đơn hợp lệ để sửa"
- * (không phân biệt lý do cụ thể trong thông báo, tránh lộ thông tin đơn của
- * người khác).
+ * Chỉ cho sửa khi ĐỦ CẢ 2 điều kiện: đơn còn hiệu lực (void_flg='0') và do
+ * ĐÚNG thu ngân đang đăng nhập tạo. KHÔNG giới hạn thời gian (người dùng đã
+ * chốt bỏ giới hạn 15 phút cũ để đổi được cả đơn đã bán từ lâu); ràng buộc
+ * "đúng người tạo" vẫn giữ để chống sửa bậy đơn của người khác qua gọi API
+ * trực tiếp. Không đạt 1 trong 2 → coi như "không đổi được" (không phân
+ * biệt lý do cụ thể trong thông báo, tránh lộ thông tin đơn của người khác).
+ *
+ * LƯU Ý: đổi phương thức của đơn cũ làm thay đổi số liệu doanh thu quá khứ
+ * theo phương thức thanh toán (tiền mặt/chuyển khoản) ở các báo cáo.
  */
 public class SaleOrderUpdatePaymentMethodProcess extends AbstractProcess {
 
 	private static final String PRG_CD = "SALE_PAY";
-
-	/** Số phút tối đa cho phép sửa phương thức thanh toán kể từ lúc tạo đơn. */
-	private static final int EDIT_WINDOW_MINUTES = 15;
 
 	public SaleOrderUpdatePaymentMethodProcess(ILogSender logSender) {
 		super(logSender);
@@ -69,8 +70,7 @@ public class SaleOrderUpdatePaymentMethodProcess extends AbstractProcess {
 			StringBuilder sql = new StringBuilder();
 			sql.append("UPDATE sale_order SET ");
 			sql.append("payment_method = ?, update_user_code = ?, update_program = ? ");
-			sql.append("WHERE sale_order_no = ? AND void_flg = '0' AND entry_user_code = ? ");
-			sql.append("AND entry_datetime >= (NOW() - INTERVAL ").append(EDIT_WINDOW_MINUTES).append(" MINUTE)");
+			sql.append("WHERE sale_order_no = ? AND void_flg = '0' AND entry_user_code = ?");
 
 			ps = dba.prepareStatement(sql);
 			ps.setString(1, req.paymentMethod);
@@ -81,7 +81,9 @@ public class SaleOrderUpdatePaymentMethodProcess extends AbstractProcess {
 
 			int affected = ps.executeUpdate();
 			if (affected == 0) {
-				throwError("ME000099");
+				// Mã riêng (không dùng lại ME000099 của SaleOrderEditGuard): thông báo ME000099 có chữ
+				// "quá thời hạn" sẽ gây hiểu nhầm vì sửa phương thức thanh toán không còn giới hạn thời gian.
+				throwError("ME000144");
 			}
 
 			res.saleOrderNo = req.saleOrderNo;
