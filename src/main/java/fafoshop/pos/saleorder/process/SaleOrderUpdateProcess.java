@@ -78,15 +78,24 @@ public class SaleOrderUpdateProcess extends AbstractProcess {
 
 		String branchCode = SaleOrderEditGuard.resolveEligibleBranchCode(dba, req.saleOrderNo, req.accessInfo.userCode);
 
-		Map<String, Integer> delta = new HashMap<>();
-		accOldSaleLotQuantities(dba, req.saleOrderNo, branchCode, req.accessInfo.userCode, delta);
-		for (SaleOrderItemDto item : req.items) {
-			item.stockCode = StockLotHelper.resolveStockCodeForSale(dba, branchCode, item.productCode, item.stockCode,
-					req.accessInfo.userCode, PRG_CD);
-			delta.merge(item.stockCode, item.quantity, Integer::sum);
-		}
+		// Đơn tạo qua màn Bổ sung đơn bán không trừ tồn lúc tạo → sửa cũng KHÔNG
+		// điều chỉnh tồn, không gắn lô (stock_code giữ NULL) — xem
+		// docs/pos-bo-sung-don-ban.md.
+		if (SaleOrderStockAdjuster.isBackfillOrder(dba, req.saleOrderNo)) {
+			for (SaleOrderItemDto item : req.items) {
+				item.stockCode = null;
+			}
+		} else {
+			Map<String, Integer> delta = new HashMap<>();
+			accOldSaleLotQuantities(dba, req.saleOrderNo, branchCode, req.accessInfo.userCode, delta);
+			for (SaleOrderItemDto item : req.items) {
+				item.stockCode = StockLotHelper.resolveStockCodeForSale(dba, branchCode, item.productCode, item.stockCode,
+						req.accessInfo.userCode, PRG_CD);
+				delta.merge(item.stockCode, item.quantity, Integer::sum);
+			}
 
-		SaleOrderStockAdjuster.applyDelta(dba, delta, req.accessInfo.userCode, PRG_CD);
+			SaleOrderStockAdjuster.applyDelta(dba, delta, req.accessInfo.userCode, PRG_CD);
+		}
 
 		replaceItems(dba, req.saleOrderNo, branchCode, req.items, req.accessInfo.userCode);
 

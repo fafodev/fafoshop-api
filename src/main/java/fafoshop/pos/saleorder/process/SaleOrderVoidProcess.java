@@ -59,6 +59,19 @@ public class SaleOrderVoidProcess extends AbstractProcess {
 
 		String branchCode = SaleOrderEditGuard.resolveEligibleBranchCode(dba, req.saleOrderNo, req.accessInfo.userCode);
 
+		// Đơn bổ sung không trừ tồn lúc tạo → huỷ cũng không hoàn tồn.
+		if (!SaleOrderStockAdjuster.isBackfillOrder(dba, req.saleOrderNo)) {
+			restoreStock(dba, req.saleOrderNo, branchCode, req.accessInfo.userCode);
+		}
+
+		markVoid(dba, req.saleOrderNo, req.accessInfo.userCode);
+
+		res.saleOrderNo = req.saleOrderNo;
+		return res;
+	}
+
+	private void restoreStock(DBAccessor dba, String saleOrderNo, String branchCode, String userCode)
+			throws DBException, FatalException {
 		Map<String, Integer> delta = new HashMap<>();
 		ResultSet rs = null;
 		DBStatement ps = null;
@@ -66,13 +79,13 @@ public class SaleOrderVoidProcess extends AbstractProcess {
 			String sql = "SELECT stock_code, product_code, expiry_date, quantity FROM sale_order_item "
 					+ "WHERE sale_order_no = ?";
 			ps = dba.prepareStatement(sql);
-			ps.setString(1, req.saleOrderNo);
+			ps.setString(1, saleOrderNo);
 			rs = ps.executeQuery();
 			while (rs.next()) {
 				String stockCode = rs.getString("stock_code");
 				if (stockCode == null || stockCode.trim().isEmpty()) {
 					stockCode = StockLotHelper.findOrCreate(dba, branchCode, rs.getString("product_code"),
-							rs.getDate("expiry_date"), req.accessInfo.userCode, PRG_CD);
+							rs.getDate("expiry_date"), userCode, PRG_CD);
 				}
 				delta.merge(stockCode, -rs.getInt("quantity"), Integer::sum);
 			}
@@ -81,12 +94,7 @@ public class SaleOrderVoidProcess extends AbstractProcess {
 		} finally {
 			closeQuietly(rs, ps);
 		}
-		SaleOrderStockAdjuster.applyDelta(dba, delta, req.accessInfo.userCode, PRG_CD);
-
-		markVoid(dba, req.saleOrderNo, req.accessInfo.userCode);
-
-		res.saleOrderNo = req.saleOrderNo;
-		return res;
+		SaleOrderStockAdjuster.applyDelta(dba, delta, userCode, PRG_CD);
 	}
 
 	private void validateSaleOrderNo(String saleOrderNo) throws ProcessCheckErrorException {
